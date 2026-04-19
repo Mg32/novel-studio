@@ -1,0 +1,377 @@
+import { useEffect, useMemo, useState } from "react";
+import { Box, Flex, Input, Menu, Portal, Text } from "@chakra-ui/react";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { FiChevronDown, FiChevronUp, FiMoreVertical, FiMove, FiPlus } from "react-icons/fi";
+import TipIconButton from "./TipIconButton";
+import CommandEditor from "./CommandEditor";
+import { EDITOR_FONT } from "../constants/editor";
+
+function EditorInput(props) {
+  return <Input size="sm" borderWidth="0" {...props} />;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function parseIndexId(id, prefix) {
+  const value = String(id);
+  if (!value.startsWith(prefix)) {
+    return -1;
+  }
+  return Number(value.slice(prefix.length));
+}
+
+function createInsertedTextCommand() {
+  return { type: "text", text: "new text" };
+}
+
+function SortableLabel({
+  id,
+  labelData,
+  labelIndex,
+  isOpen,
+  isDark,
+  iconButtonStyle,
+  onToggleOpen,
+  onChangeLabelName,
+  onDeleteLabel,
+  onAddCommand,
+  onCommandDragEnd,
+  onCommandChange,
+  onCommandDelete,
+  onCommandAddAfter,
+  commandErrors,
+  characterNameOptions,
+}) {
+  const { setNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({
+    id,
+    animateLayoutChanges: () => false,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(
+      transform ? { ...transform, x: 0, scaleX: 1, scaleY: 1 } : null,
+    ),
+    transition: transition ?? "none",
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  const commandIds = useMemo(
+    () => labelData.commands.map((_, commandIndex) => `command-${labelIndex}-${commandIndex}`),
+    [labelData.commands, labelIndex],
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+
+  return (
+    <Box
+      ref={setNodeRef}
+      data-label-id={id}
+      style={style}
+      position="relative"
+      pl={{ base: "1", md: "2" }}
+      _after={{
+        content: '""',
+        position: "absolute",
+        top: "0",
+        bottom: "0",
+        left: "0",
+        width: "1px",
+        bg: isDark ? "whiteAlpha.200" : "blackAlpha.200",
+      }}
+    >
+      <Flex gap="1.5" align="center">
+        <TipIconButton label="Toggle label" size="xs" {...iconButtonStyle} onClick={onToggleOpen}>
+          {isOpen ? <FiChevronUp /> : <FiChevronDown />}
+        </TipIconButton>
+
+        <Box flex="1" minW="0">
+          <EditorInput
+            bg={isDark ? "gray.800" : "white"}
+            color={isDark ? "gray.100" : "gray.900"}
+            fontFamily={EDITOR_FONT}
+            value={labelData.label}
+            placeholder="label"
+            onChange={(event) => onChangeLabelName(event.target.value)}
+          />
+        </Box>
+
+        <TipIconButton label="Drag label" size="xs" cursor="grab" {...iconButtonStyle} {...attributes} {...listeners}>
+          <FiMove />
+        </TipIconButton>
+
+        <Menu.Root positioning={{ placement: "bottom-end" }}>
+          <Menu.Trigger asChild>
+            <Box>
+              <TipIconButton label="Label menu" size="xs" {...iconButtonStyle}>
+                <FiMoreVertical />
+              </TipIconButton>
+            </Box>
+          </Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <Menu.Content>
+                <Menu.Item value="add-command" onSelect={onAddCommand}>
+                  Add command
+                </Menu.Item>
+                <Menu.Item value="delete-label" color="red.500" onSelect={onDeleteLabel}>
+                  Delete label
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Flex>
+
+      {isOpen ? (
+        <Box pt="1.5">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onCommandDragEnd}>
+            <SortableContext items={commandIds} strategy={verticalListSortingStrategy}>
+              <Flex direction="column" gap="1.5">
+                {labelData.commands.map((command, commandIndex) => (
+                  <SortableCommand
+                    key={commandIds[commandIndex]}
+                    id={commandIds[commandIndex]}
+                    command={command}
+                    isDark={isDark}
+                    iconButtonStyle={iconButtonStyle}
+                    onChange={(nextCommand) => onCommandChange(commandIndex, nextCommand)}
+                    onDelete={() => onCommandDelete(commandIndex)}
+                    onAddAfter={() => onCommandAddAfter(commandIndex)}
+                    errorMessage={commandErrors?.[commandIndex] || ""}
+                    characterNameOptions={characterNameOptions}
+                  />
+                ))}
+              </Flex>
+            </SortableContext>
+          </DndContext>
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
+function SortableCommand({
+  id,
+  command,
+  isDark,
+  iconButtonStyle,
+  onChange,
+  onDelete,
+  onAddAfter,
+  errorMessage,
+  characterNameOptions,
+}) {
+  const { setNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({
+    id,
+    animateLayoutChanges: () => false,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(
+      transform ? { ...transform, x: 0, scaleX: 1, scaleY: 1 } : null,
+    ),
+    transition: transition ?? "none",
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <Box ref={setNodeRef} data-command-id={id} style={style} pl={{ base: "1", md: "2" }}>
+      <CommandEditor
+        command={command}
+        errorMessage={errorMessage}
+        characterNameOptions={characterNameOptions}
+        isDark={isDark}
+        iconButtonStyle={iconButtonStyle}
+        onChange={onChange}
+        onDelete={onDelete}
+        onAddAfter={onAddAfter}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </Box>
+  );
+}
+
+function LabelEditor({
+  scenes,
+  onChange,
+  isDark,
+  iconButtonStyle,
+  jumpTo,
+  commandErrorMap,
+  characterNameOptions,
+}) {
+  const labelIds = useMemo(() => scenes.map((_, labelIndex) => `label-${labelIndex}`), [scenes]);
+  const [openLabelIds, setOpenLabelIds] = useState(labelIds);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+
+  const normalizedOpenLabelIds = useMemo(() => {
+    const base = openLabelIds.filter((id) => labelIds.includes(id));
+    if (jumpTo?.labelIndex == null) {
+      return base;
+    }
+    const forced = `label-${jumpTo.labelIndex}`;
+    return base.includes(forced) ? base : [...base, forced];
+  }, [openLabelIds, labelIds, jumpTo]);
+
+  const updateLabel = (labelIndex, updater) => {
+    const nextScenes = clone(scenes);
+    updater(nextScenes[labelIndex]);
+    onChange(nextScenes);
+  };
+
+  const deleteLabel = (labelIndex) => {
+    const nextScenes = clone(scenes);
+    nextScenes.splice(labelIndex, 1);
+    if (nextScenes.length === 0) {
+      nextScenes.push({ label: "start", commands: [] });
+    }
+    onChange(nextScenes);
+  };
+
+  const handleLabelDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) {
+      return;
+    }
+    const activeIndex = parseIndexId(active.id, "label-");
+    const overIndex = parseIndexId(over.id, "label-");
+    if (activeIndex < 0 || overIndex < 0) {
+      return;
+    }
+    onChange(arrayMove(scenes, activeIndex, overIndex));
+  };
+
+  const handleCommandDragEnd = (labelIndex) => ({ active, over }) => {
+    if (!over || active.id === over.id) {
+      return;
+    }
+    const commandPrefix = `command-${labelIndex}-`;
+    const activeIndex = parseIndexId(active.id, commandPrefix);
+    const overIndex = parseIndexId(over.id, commandPrefix);
+    if (activeIndex < 0 || overIndex < 0) {
+      return;
+    }
+    updateLabel(labelIndex, (draft) => {
+      draft.commands = arrayMove(draft.commands, activeIndex, overIndex);
+    });
+  };
+
+  useEffect(() => {
+    if (!jumpTo || jumpTo.labelIndex == null) {
+      return;
+    }
+    const scrollTimer = window.setTimeout(() => {
+      const commandId =
+        jumpTo.commandIndex != null
+          ? `command-${jumpTo.labelIndex}-${jumpTo.commandIndex}`
+          : null;
+      const labelId = `label-${jumpTo.labelIndex}`;
+      const selector = commandId
+        ? `[data-command-id="${commandId}"]`
+        : `[data-label-id="${labelId}"]`;
+      const target = document.querySelector(selector);
+      if (target && "scrollIntoView" in target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        const focusTarget =
+          target.querySelector("textarea, input:not([type='hidden'])") ||
+          target.querySelector("button, [role='combobox']");
+        if (focusTarget && "focus" in focusTarget) {
+          focusTarget.focus({ preventScroll: true });
+        }
+      }
+    }, 60);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [jumpTo]);
+
+  return (
+    <Flex direction="column" gap="1.5">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLabelDragEnd}>
+        <SortableContext items={labelIds} strategy={verticalListSortingStrategy}>
+          <Flex direction="column" gap="1.5">
+            {scenes.map((scene, labelIndex) => (
+              <SortableLabel
+                key={labelIds[labelIndex]}
+                id={labelIds[labelIndex]}
+                labelData={scene}
+                labelIndex={labelIndex}
+                isOpen={normalizedOpenLabelIds.includes(labelIds[labelIndex])}
+                isDark={isDark}
+                iconButtonStyle={iconButtonStyle}
+                onToggleOpen={() =>
+                  setOpenLabelIds((current) =>
+                    current.includes(labelIds[labelIndex])
+                      ? current.filter((value) => value !== labelIds[labelIndex])
+                      : [...current, labelIds[labelIndex]],
+                  )
+                }
+                onChangeLabelName={(label) =>
+                  updateLabel(labelIndex, (draft) => {
+                    draft.label = label;
+                  })
+                }
+                onDeleteLabel={() => deleteLabel(labelIndex)}
+                onAddCommand={() =>
+                  updateLabel(labelIndex, (draft) => {
+                    draft.commands.push(createInsertedTextCommand());
+                  })
+                }
+                onCommandDragEnd={handleCommandDragEnd(labelIndex)}
+                onCommandChange={(commandIndex, nextCommand) =>
+                  updateLabel(labelIndex, (draft) => {
+                    draft.commands[commandIndex] = nextCommand;
+                  })
+                }
+                onCommandDelete={(commandIndex) =>
+                  updateLabel(labelIndex, (draft) => {
+                    draft.commands.splice(commandIndex, 1);
+                  })
+                }
+                onCommandAddAfter={(commandIndex) =>
+                  updateLabel(labelIndex, (draft) => {
+                    draft.commands.splice(commandIndex + 1, 0, createInsertedTextCommand());
+                  })
+                }
+                commandErrors={commandErrorMap?.[labelIndex] || {}}
+                characterNameOptions={characterNameOptions}
+              />
+            ))}
+          </Flex>
+        </SortableContext>
+      </DndContext>
+
+      <TipIconButton
+        alignSelf="flex-start"
+        label="Add label"
+        size="sm"
+        {...iconButtonStyle}
+        onClick={() => {
+          const nextLabels = [...scenes, { label: `label_${scenes.length + 1}`, commands: [] }];
+          onChange(nextLabels);
+          setOpenLabelIds(nextLabels.map((_, index) => `label-${index}`));
+        }}
+      >
+        <FiPlus />
+      </TipIconButton>
+
+      {scenes.length === 0 ? (
+        <Text fontSize="xs" color={isDark ? "gray.300" : "gray.600"}>
+          No labels.
+        </Text>
+      ) : null}
+    </Flex>
+  );
+}
+
+export default LabelEditor;

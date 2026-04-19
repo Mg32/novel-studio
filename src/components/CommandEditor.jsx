@@ -1,0 +1,366 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { Box, Flex, Grid, Input, Menu, Portal, Text, Textarea } from "@chakra-ui/react";
+import {
+  FiChevronRight,
+  FiChevronsRight,
+  FiEye,
+  FiEyeOff,
+  FiImage,
+  FiMoreVertical,
+  FiMove,
+  FiUser,
+  FiType,
+  FiUserPlus,
+} from "react-icons/fi";
+import AppSelect from "./AppSelect";
+import TipIconButton from "./TipIconButton";
+import {
+  BG_TEMPLATE_OPTIONS,
+  CHARA_TEMPLATE_OPTIONS,
+  COMMAND_OPTIONS,
+  EDITOR_FONT,
+} from "../constants/editor";
+import { createEmptyCommand } from "../lib/script";
+
+function EditorInput(props) {
+  return <Input size="sm" borderWidth="0" {...props} />;
+}
+
+function AutoResizeTextarea({ value, onChange, minH = 56, ...props }) {
+  const textareaRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (!element) {
+      return;
+    }
+    element.style.height = "auto";
+    element.style.height = `${Math.max(element.scrollHeight, minH)}px`;
+  }, [value, minH]);
+
+  return (
+    <Textarea
+      ref={textareaRef}
+      size="sm"
+      borderWidth="0"
+      resize="none"
+      overflow="hidden"
+      minH={`${minH}px`}
+      value={value}
+      onChange={onChange}
+      onInput={(event) => {
+        const element = event.currentTarget;
+        element.style.height = "auto";
+        element.style.height = `${Math.max(element.scrollHeight, minH)}px`;
+      }}
+      {...props}
+    />
+  );
+}
+
+function ImagePreview({ src, alt, isDark, size = "68px" }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <Box
+      rounded="md"
+      bg={isDark ? "gray.800" : "gray.100"}
+      w={size}
+      h={size}
+      minW={size}
+      minH={size}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      overflow="hidden"
+    >
+      {src && !failed ? (
+        <Box
+          as="img"
+          src={src}
+          alt={alt}
+          onError={() => setFailed(true)}
+          maxW="100%"
+          maxH="100%"
+          objectFit="contain"
+        />
+      ) : (
+        <Text fontSize="10px" color={isDark ? "gray.400" : "gray.500"}>
+          no img
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+function createCommandForType(nextValue) {
+  if (nextValue === "speaker") {
+    return { type: "speaker", name: "name" };
+  }
+  if (nextValue === "text") {
+    return { type: "text", text: "new text" };
+  }
+  return createEmptyCommand(nextValue);
+}
+
+const commandTypeOptions = [
+  { label: "speaker", value: "speaker" },
+  { label: "text", value: "text" },
+  { label: "bg", value: "bg" },
+  { label: "jump", value: "jump" },
+  { label: "chara_new", value: "chara_new" },
+  { label: "chara_show", value: "chara_show" },
+  { label: "chara_hide", value: "chara_hide" },
+  { label: "r", value: "r" },
+];
+
+function toGuiTextValue(value) {
+  const source = value == null ? "" : String(value);
+  return source.replace(/\[p\]\s*$/, "");
+}
+
+const commandTypeIconMap = {
+  speaker: FiUser,
+  text: FiType,
+  bg: FiImage,
+  jump: FiChevronRight,
+  chara_new: FiUserPlus,
+  chara_show: FiEye,
+  chara_hide: FiEyeOff,
+  p: FiChevronsRight,
+  r: FiChevronsRight,
+};
+
+function buildHostedUrl(path) {
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+  const normalizedPath = String(path || "").replace(/^\/+/, "");
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+function createTemplateOptions(baseOptions) {
+  return [
+    { label: "template", value: "" },
+    ...baseOptions.map((item) => ({
+      label: item.label,
+      value: buildHostedUrl(item.path),
+    })),
+  ];
+}
+
+const bgTemplateOptions = createTemplateOptions(BG_TEMPLATE_OPTIONS);
+const charaTemplateOptions = createTemplateOptions(CHARA_TEMPLATE_OPTIONS);
+
+function CommandEditor({
+  command,
+  onChange,
+  onDelete,
+  onAddAfter,
+  errorMessage,
+  characterNameOptions,
+  isDark,
+  iconButtonStyle,
+  dragHandleProps,
+}) {
+  const currentType =
+    command.type === "text" ? "text" : command.type === "speaker" ? "speaker" : command.tag;
+  const TypeIcon = commandTypeIconMap[currentType] ?? FiType;
+
+  const setAttr = (key, value) => {
+    onChange({ ...command, attrs: { ...(command.attrs || {}), [key]: value } });
+  };
+  const charaNameSelectOptions = [
+    { label: "name", value: "" },
+    ...characterNameOptions.map((name) => ({ label: name, value: name })),
+  ];
+  const currentCharaName = command.attrs?.name || "";
+
+  return (
+    <Box p="0">
+      <Flex gap="1.5" align="center" mb="1.5">
+        <Box
+          w="7"
+          h="7"
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+          color={isDark ? "gray.200" : "gray.700"}
+        >
+          <TypeIcon />
+        </Box>
+        <Box flex="1">
+          <AppSelect
+            value={currentType}
+            onChange={(nextValue) => onChange(createCommandForType(nextValue))}
+            options={commandTypeOptions.filter((option) => COMMAND_OPTIONS.includes(option.value))}
+            isDark={isDark}
+            fontFamily={EDITOR_FONT}
+          />
+        </Box>
+        <TipIconButton label="Drag" size="xs" cursor="grab" {...iconButtonStyle} {...dragHandleProps}>
+          <FiMove />
+        </TipIconButton>
+        <Menu.Root positioning={{ placement: "bottom-end" }}>
+          <Menu.Trigger asChild>
+            <Box>
+              <TipIconButton label="Menu" size="xs" {...iconButtonStyle}>
+                <FiMoreVertical />
+              </TipIconButton>
+            </Box>
+          </Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <Menu.Content>
+                <Menu.Item value="add-after" onSelect={onAddAfter}>
+                  Add command below
+                </Menu.Item>
+                <Menu.Item value="delete" color="red.500" onSelect={onDelete}>
+                  Delete command
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Flex>
+
+      <Box ml="34px">
+        {command.type === "speaker" && (
+          <EditorInput
+            bg={isDark ? "gray.800" : "white"}
+            color={isDark ? "gray.100" : "gray.900"}
+            fontFamily={EDITOR_FONT}
+            value={command.name || ""}
+            placeholder="speaker"
+            onChange={(event) => onChange({ ...command, name: event.target.value })}
+          />
+        )}
+
+        {command.type === "text" && (
+          <AutoResizeTextarea
+            minH={56}
+            bg={isDark ? "gray.800" : "white"}
+            color={isDark ? "gray.100" : "gray.900"}
+            fontFamily={EDITOR_FONT}
+            value={toGuiTextValue(command.text || "")}
+            placeholder="text"
+            onChange={(event) => onChange({ ...command, text: event.target.value })}
+          />
+        )}
+
+        {command.type === "tag" && command.tag === "bg" && (
+          <Flex gap="2" align="stretch">
+            <Flex direction="column" gap="2" flex="1" minW="0">
+              <EditorInput
+                bg={isDark ? "gray.800" : "white"}
+                color={isDark ? "gray.100" : "gray.900"}
+                fontFamily={EDITOR_FONT}
+                value={command.attrs.storage || ""}
+                placeholder="bg url"
+                onChange={(event) => setAttr("storage", event.target.value)}
+              />
+              <AppSelect
+                value={bgTemplateOptions.some((item) => item.value === (command.attrs.storage || "")) ? command.attrs.storage || "" : ""}
+                onChange={(nextValue) => {
+                  if (nextValue) {
+                    setAttr("storage", nextValue);
+                  }
+                }}
+                options={bgTemplateOptions}
+                isDark={isDark}
+                fontFamily={EDITOR_FONT}
+                placeholder="bg template"
+              />
+            </Flex>
+            <ImagePreview
+              key={command.attrs.storage || "bg-empty"}
+              src={command.attrs.storage || ""}
+              alt="background preview"
+              isDark={isDark}
+            />
+          </Flex>
+        )}
+
+        {command.type === "tag" && command.tag === "jump" && (
+          <EditorInput
+            bg={isDark ? "gray.800" : "white"}
+            color={isDark ? "gray.100" : "gray.900"}
+            fontFamily={EDITOR_FONT}
+            value={command.attrs.target || ""}
+            placeholder="target label"
+            onChange={(event) => setAttr("target", event.target.value)}
+          />
+        )}
+
+        {command.type === "tag" && command.tag === "chara_new" && (
+          <Flex gap="2" align="stretch">
+            <Flex direction="column" gap="2" flex="1" minW="0">
+              <Grid templateColumns="1fr 1fr" gap="2">
+                <EditorInput
+                  bg={isDark ? "gray.800" : "white"}
+                  color={isDark ? "gray.100" : "gray.900"}
+                  fontFamily={EDITOR_FONT}
+                  value={command.attrs.name || ""}
+                  placeholder="name"
+                  onChange={(event) => setAttr("name", event.target.value)}
+                />
+                <EditorInput
+                  bg={isDark ? "gray.800" : "white"}
+                  color={isDark ? "gray.100" : "gray.900"}
+                  fontFamily={EDITOR_FONT}
+                  value={command.attrs.storage || ""}
+                  placeholder="image url"
+                  onChange={(event) => setAttr("storage", event.target.value)}
+                />
+              </Grid>
+              <AppSelect
+                value={
+                  charaTemplateOptions.some((item) => item.value === (command.attrs.storage || ""))
+                    ? command.attrs.storage || ""
+                    : ""
+                }
+                onChange={(nextValue) => {
+                  if (nextValue) {
+                    setAttr("storage", nextValue);
+                  }
+                }}
+                options={charaTemplateOptions}
+                isDark={isDark}
+                fontFamily={EDITOR_FONT}
+                placeholder="chara template"
+              />
+            </Flex>
+            <ImagePreview
+              key={command.attrs.storage || "chara-empty"}
+              src={command.attrs.storage || ""}
+              alt="character preview"
+              isDark={isDark}
+            />
+          </Flex>
+        )}
+
+        {command.type === "tag" &&
+          (command.tag === "chara_show" || command.tag === "chara_hide") && (
+            <AppSelect
+              value={
+                charaNameSelectOptions.some((item) => item.value === currentCharaName)
+                  ? currentCharaName
+                  : ""
+              }
+              onChange={(nextValue) => setAttr("name", nextValue)}
+              options={charaNameSelectOptions}
+              isDark={isDark}
+              fontFamily={EDITOR_FONT}
+              placeholder="name"
+            />
+          )}
+        {errorMessage ? (
+          <Text mt="1" color="red.500" fontSize="xs">
+            {errorMessage}
+          </Text>
+        ) : null}
+      </Box>
+    </Box>
+  );
+}
+
+export default CommandEditor;

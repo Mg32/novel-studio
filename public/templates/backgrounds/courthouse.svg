@@ -1,0 +1,13 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#ece3d6"/>
+<rect y="520" width="1280" height="200" fill="#b59a7d"/>
+<polygon points="640,120 1060,260 220,260" fill="#8a6d4d"/>
+<rect x="260" y="260" width="760" height="260" fill="#d8c2a6"/>
+<g fill="#9a7b58">
+  <rect x="340" y="280" width="60" height="240"/>
+  <rect x="460" y="280" width="60" height="240"/>
+  <rect x="580" y="280" width="60" height="240"/>
+  <rect x="700" y="280" width="60" height="240"/>
+  <rect x="820" y="280" width="60" height="240"/>
+</g>
+</svg>
