@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Flex, Grid, Input, Menu, Portal, Text, Textarea } from "@chakra-ui/react";
 import {
+  FiGitBranch,
   FiChevronRight,
   FiChevronsRight,
   FiEye,
@@ -110,17 +111,23 @@ function createCommandForType(nextValue) {
   if (nextValue === "text") {
     return { type: "text", text: "new text" };
   }
+  if (nextValue === "link") {
+    return { type: "tag", tag: "link", attrs: { target: "*start" }, text: "choice" };
+  }
   return createEmptyCommand(nextValue);
 }
 
 const commandTypeOptions = [
   { label: "speaker", value: "speaker" },
   { label: "text", value: "text" },
+  { label: "link", value: "link" },
   { label: "bg", value: "bg" },
   { label: "jump", value: "jump" },
   { label: "chara_new", value: "chara_new" },
   { label: "chara_show", value: "chara_show" },
   { label: "chara_hide", value: "chara_hide" },
+  { label: "s", value: "s" },
+  { label: "cm", value: "cm" },
   { label: "r", value: "r" },
 ];
 
@@ -132,6 +139,7 @@ function toGuiTextValue(value) {
 const commandTypeIconMap = {
   speaker: FiUser,
   text: FiType,
+  link: FiGitBranch,
   bg: FiImage,
   jump: FiChevronRight,
   chara_new: FiUserPlus,
@@ -332,9 +340,32 @@ const CommandEditor = memo(function CommandEditor({
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
             value={command.attrs.target || ""}
-            placeholder="target label"
+            placeholder="*target label"
             onChange={(event) => setAttr("target", event.target.value)}
           />
+        )}
+
+        {command.type === "tag" && command.tag === "link" && (
+          <Grid templateColumns="1fr 1fr" gap="2">
+            <EditorInput
+              isDark={isDark}
+              bg={isDark ? "gray.800" : "white"}
+              color={isDark ? "gray.100" : "gray.900"}
+              fontFamily={EDITOR_FONT}
+              value={command.text || ""}
+              placeholder="choice text"
+              onChange={(event) => onChange({ ...command, text: event.target.value })}
+            />
+            <EditorInput
+              isDark={isDark}
+              bg={isDark ? "gray.800" : "white"}
+              color={isDark ? "gray.100" : "gray.900"}
+              fontFamily={EDITOR_FONT}
+              value={command.attrs.target || ""}
+              placeholder="*target label"
+              onChange={(event) => setAttr("target", event.target.value)}
+            />
+          </Grid>
         )}
 
         {command.type === "tag" && command.tag === "chara_new" && (

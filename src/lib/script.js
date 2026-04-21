@@ -1,10 +1,13 @@
 const SUPPORTED_TAGS = new Set([
   "label",
   "jump",
+  "link",
   "chara_new",
   "chara_show",
   "chara_hide",
   "bg",
+  "s",
+  "cm",
   "p",
   "r",
 ]);
@@ -12,10 +15,13 @@ const SUPPORTED_TAGS = new Set([
 const REQUIRED_ATTRS = {
   label: ["name"],
   jump: ["target"],
+  link: ["target"],
   chara_new: ["name", "storage"],
   chara_show: ["name"],
   chara_hide: ["name"],
   bg: ["storage"],
+  s: [],
+  cm: [],
   p: [],
   r: [],
 };
@@ -45,6 +51,22 @@ function quoteIfNeeded(value) {
     return `"${stringValue.replace(/"/g, '\\"')}"`;
   }
   return stringValue;
+}
+
+function normalizeLabelName(value) {
+  const source = value == null ? "" : String(value).trim();
+  if (!source) {
+    return "";
+  }
+  return source.startsWith("*") ? source : `*${source}`;
+}
+
+function denormalizeLabelName(value) {
+  const source = value == null ? "" : String(value).trim();
+  if (!source) {
+    return "";
+  }
+  return source.startsWith("*") ? source.slice(1) : source;
 }
 
 function parseTag(lineText, lineNo) {
@@ -106,12 +128,44 @@ function parseTag(lineText, lineNo) {
     }
   }
 
+  if (tag === "label" && attrs.name) {
+    attrs.name = normalizeLabelName(attrs.name);
+  }
+  if ((tag === "jump" || tag === "link") && attrs.target) {
+    attrs.target = normalizeLabelName(attrs.target);
+  }
+
   return {
     command: {
       type: "tag",
       tag,
       attrs,
       line: lineNo,
+    },
+    diagnostics,
+  };
+}
+
+function parseAtTag(lineText, lineNo) {
+  const normalized = `[${lineText.slice(1).trim()}]`;
+  return parseTag(normalized, lineNo);
+}
+
+function parseLinkLine(rawLine, lineNo) {
+  const diagnostics = [];
+  const match = rawLine.match(/^\s*\[link\s+([^\]]+)\](.*?)\[endlink\](?:\s*\[r\])?\s*$/);
+  if (!match) {
+    return { command: null, diagnostics };
+  }
+  const parsedTag = parseTag(`[link ${match[1]}]`, lineNo);
+  diagnostics.push(...parsedTag.diagnostics);
+  if (!parsedTag.command) {
+    return { command: null, diagnostics };
+  }
+  return {
+    command: {
+      ...parsedTag.command,
+      text: match[2] ?? "",
     },
     diagnostics,
   };
@@ -184,6 +238,35 @@ export function parseScript(text) {
         name: speakerName,
         line: lineNo,
       });
+      continue;
+    }
+
+    if (trimmed.startsWith("*")) {
+      pushPendingText(ast, pending);
+      ast.push({
+        type: "tag",
+        tag: "label",
+        attrs: { name: normalizeLabelName(trimmed) },
+        line: lineNo,
+      });
+      continue;
+    }
+
+    const parsedLinkLine = parseLinkLine(rawLine, lineNo);
+    if (parsedLinkLine.command) {
+      pushPendingText(ast, pending);
+      diagnostics.push(...parsedLinkLine.diagnostics);
+      ast.push(parsedLinkLine.command);
+      continue;
+    }
+
+    if (trimmed.startsWith("@")) {
+      pushPendingText(ast, pending);
+      const parsedAt = parseAtTag(trimmed, lineNo);
+      diagnostics.push(...parsedAt.diagnostics);
+      if (parsedAt.command) {
+        ast.push(parsedAt.command);
+      }
       continue;
     }
 
@@ -276,7 +359,14 @@ export function parseScript(text) {
 }
 
 function serializeTag(command) {
-  const attrs = Object.entries(command.attrs || {})
+  const normalizedAttrs = { ...(command.attrs || {}) };
+  if (command.tag === "label" && normalizedAttrs.name) {
+    normalizedAttrs.name = normalizeLabelName(normalizedAttrs.name);
+  }
+  if ((command.tag === "jump" || command.tag === "link") && normalizedAttrs.target) {
+    normalizedAttrs.target = normalizeLabelName(normalizedAttrs.target);
+  }
+  const attrs = Object.entries(normalizedAttrs)
     .filter(([, value]) => value != null && String(value).length > 0)
     .map(([key, value]) => `${key}=${quoteIfNeeded(value)}`)
     .join(" ");
@@ -295,6 +385,22 @@ export function serializeScript(ast) {
     }
     if (command.type === "text") {
       lines.push(ensureTextEndsWithPageBreak(command.text ?? ""));
+      continue;
+    }
+    if (command.type === "tag" && command.tag === "label") {
+      const name = normalizeLabelName(command.attrs?.name || "");
+      if (name) {
+        lines.push(name);
+        continue;
+      }
+    }
+    if (command.type === "tag" && command.tag === "link") {
+      const attrs = Object.entries(command.attrs || {})
+        .filter(([, value]) => value != null && String(value).length > 0)
+        .map(([key, value]) => `${key}=${quoteIfNeeded(value)}`)
+        .join(" ");
+      const linkText = command.text ?? "";
+      lines.push(`[link ${attrs}]${linkText}[endlink]`);
       continue;
     }
     lines.push(serializeTag(command));
@@ -319,7 +425,7 @@ export function astToScenes(ast) {
   for (const command of ast) {
     if (command.type === "tag" && command.tag === "label") {
       current = {
-        label: command.attrs.name || `scene_${scenes.length + 1}`,
+        label: denormalizeLabelName(command.attrs.name) || `scene_${scenes.length + 1}`,
         commands: [],
       };
       scenes.push(current);
@@ -352,7 +458,7 @@ export function scenesToAst(scenes) {
     ast.push({
       type: "tag",
       tag: "label",
-      attrs: { name: scene.label || "start" },
+      attrs: { name: normalizeLabelName(scene.label || "start") },
       line: 0,
     });
     for (const command of scene.commands) {
@@ -377,6 +483,7 @@ export function scenesToAst(scenes) {
         type: "tag",
         tag: command.tag,
         attrs: { ...(command.attrs || {}) },
+        text: command.text,
         line: 0,
       });
     }
@@ -399,6 +506,9 @@ export function createEmptyCommand(tag = "text") {
   }
   if (tag === "jump") {
     return { type: "tag", tag, attrs: { target: "" } };
+  }
+  if (tag === "link") {
+    return { type: "tag", tag, attrs: { target: "*start" }, text: "choice" };
   }
   if (tag === "chara_new") {
     return { type: "tag", tag, attrs: { name: "", storage: "" } };

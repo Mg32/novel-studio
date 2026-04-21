@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, Text } from "@chakra-ui/react";
 
-function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, onAdvance }) {
+function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, onAdvance, onSelectChoice }) {
   const isWide = aspect === "16:9";
   const stageStyle = isWide ? { aspectRatio: "16 / 9" } : { aspectRatio: "9 / 16" };
   const fullMessage = frame?.message || "";
@@ -81,6 +81,9 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
       setDisplayMessage(fullMessage);
       return;
     }
+    if (frame?.choices?.length > 0) {
+      return;
+    }
     onAdvance?.();
   };
 
@@ -146,6 +149,23 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
                   {fullMessage.length === 0 ? "" : displayMessage}
                 </Text>
               </Box>
+              {frame.choices?.length ? (
+                <Flex direction="column" gap="1.5" onPointerUp={(event) => event.stopPropagation()}>
+                  {frame.choices.map((choice, index) => (
+                    <Button
+                      key={`${choice.target}-${index}`}
+                      size="sm"
+                      justifyContent="flex-start"
+                      bg={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
+                      color={isDark ? "gray.100" : "gray.800"}
+                      _hover={{ bg: isDark ? "whiteAlpha.300" : "blackAlpha.200" }}
+                      onClick={() => onSelectChoice?.(choice.target)}
+                    >
+                      {choice.text || "(choice)"}
+                    </Button>
+                  ))}
+                </Flex>
+              ) : null}
             </Box>
           </>
         ) : (
@@ -168,6 +188,6 @@ export default memo(
     prev.isDark === next.isDark &&
     prev.maxHeight === next.maxHeight &&
     prev.emptyMessage === next.emptyMessage &&
-    prev.canAdvance === next.canAdvance &&
-    prev.onAdvance === next.onAdvance,
+    prev.onAdvance === next.onAdvance &&
+    prev.onSelectChoice === next.onSelectChoice,
 );

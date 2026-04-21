@@ -274,17 +274,21 @@ function App() {
   const currentFrame = frames[frameIndex] || null;
   const labels = useMemo(() => {
     const set = new Set();
+    const denormalize = (value) => {
+      const source = value == null ? "" : String(value).trim();
+      return source.startsWith("*") ? source.slice(1) : source;
+    };
     if (isGuiDirty) {
       for (const scene of guiScenes) {
         if (scene.label) {
-          set.add(scene.label);
+          set.add(denormalize(scene.label));
         }
       }
       return [...set];
     }
     for (const command of ast) {
       if (command.type === "tag" && command.tag === "label" && command.attrs?.name) {
-        set.add(command.attrs.name);
+        set.add(denormalize(command.attrs.name));
       }
     }
     return [...set];
@@ -450,12 +454,41 @@ function App() {
       runPreview();
       return;
     }
+    if (currentFrame.choices?.length) {
+      return;
+    }
     if (frameIndex >= frames.length - 1) {
       stopPreview();
       return;
     }
     advanceFrame();
   }, [currentFrame, frameIndex, frames.length, runPreview, stopPreview, advanceFrame]);
+
+  const handleChoiceSelect = useCallback(
+    (targetLabel) => {
+      if (!targetLabel) {
+        return;
+      }
+      const runtime = currentFrame?.choiceRuntime;
+      if (!runtime?.state) {
+        return;
+      }
+      try {
+        const result = runScenario({
+          ast,
+          startAt: { label: targetLabel },
+          initialState: runtime.state,
+          initialLabel: runtime.label || currentFrame?.cursor?.label || "",
+        });
+        setFrames(result.frames);
+        setFrameIndex(0);
+        setRunError("");
+      } catch (error) {
+        setRunError(error.message);
+      }
+    },
+    [currentFrame, ast],
+  );
 
   const jumpToCurrentGui = useCallback(() => {
     const astIndex = currentFrame?.cursor?.astIndex;
@@ -627,8 +660,8 @@ function App() {
                 frame={currentFrame}
                 aspect={aspect}
                 isDark={isDark}
-                canAdvance={frameIndex < frames.length - 1}
                 onAdvance={handleStageTap}
+                onSelectChoice={handleChoiceSelect}
                 maxHeight="100%"
                 emptyMessage="Run preview."
               />
@@ -768,8 +801,8 @@ function App() {
               frame={currentFrame}
               aspect={aspect}
               isDark={isDark}
-              canAdvance={frameIndex < frames.length - 1}
               onAdvance={handleStageTap}
+              onSelectChoice={handleChoiceSelect}
               maxHeight="calc(100dvh - 96px)"
               emptyMessage="Run preview."
             />

@@ -3,11 +3,14 @@ export const STORAGE_KEY = "novel-studio-script-v1";
 export const COMMAND_OPTIONS = [
   "speaker",
   "text",
+  "link",
   "bg",
   "jump",
   "chara_new",
   "chara_show",
   "chara_hide",
+  "s",
+  "cm",
   "r",
 ];
 

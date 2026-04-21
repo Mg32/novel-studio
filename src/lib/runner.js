@@ -1,30 +1,62 @@
 function buildLabelIndex(ast) {
   const labels = new Map();
+  const normalize = (value) => {
+    const source = value == null ? "" : String(value).trim();
+    if (!source) {
+      return "";
+    }
+    return source.startsWith("*") ? source : `*${source}`;
+  };
   for (let i = 0; i < ast.length; i += 1) {
     const command = ast[i];
     if (command.type === "tag" && command.tag === "label" && command.attrs.name) {
-      labels.set(command.attrs.name, i);
+      labels.set(normalize(command.attrs.name), i);
     }
   }
   return labels;
 }
 
-function snapshotState(state, message, cursor) {
+function cloneScenarioState(state) {
+  return {
+    background: state.background || "",
+    speaker: state.speaker || "",
+    characters: Object.fromEntries(
+      Object.entries(state.characters || {}).map(([key, value]) => [
+        key,
+        {
+          name: value?.name || key,
+          storage: value?.storage || "",
+          visible: Boolean(value?.visible),
+        },
+      ]),
+    ),
+  };
+}
+
+function snapshotState(state, message, cursor, extra = {}) {
   return {
     background: state.background,
     characters: Object.values(state.characters).filter((character) => character.visible),
     speaker: state.speaker || "",
     message,
     cursor: cursor || null,
+    ...extra,
   };
 }
 
-export function runScenario({ ast, startAt = {} }) {
+export function runScenario({ ast, startAt = {}, initialState = null, initialLabel = "" }) {
   const labels = buildLabelIndex(ast);
+  const normalizeLabel = (value) => {
+    const source = value == null ? "" : String(value).trim();
+    if (!source) {
+      return "";
+    }
+    return source.startsWith("*") ? source : `*${source}`;
+  };
   let pc = 0;
 
   if (startAt.label && startAt.label.trim().length > 0) {
-    const labelIndex = labels.get(startAt.label.trim());
+    const labelIndex = labels.get(normalizeLabel(startAt.label));
     if (labelIndex == null) {
       throw new Error(`Start label "${startAt.label}" was not found.`);
     }
@@ -38,16 +70,19 @@ export function runScenario({ ast, startAt = {} }) {
     pc = indexByLine;
   }
 
-  const state = {
-    background: "",
-    characters: {},
-    speaker: "",
-  };
+  const state = initialState
+    ? cloneScenarioState(initialState)
+    : {
+        background: "",
+        characters: {},
+        speaker: "",
+      };
 
   const frames = [];
   let textBuffer = "";
   let guard = 0;
-  let currentLabel = "";
+  let currentLabel = initialLabel || "";
+  let pendingLinks = [];
 
   const flushText = (force, astIndex = null) => {
     if (!force && textBuffer.length === 0) {
@@ -127,17 +162,57 @@ export function runScenario({ ast, startAt = {} }) {
 
     switch (command.tag) {
       case "label":
-        currentLabel = command.attrs.name || "";
+        currentLabel = normalizeLabel(command.attrs.name || "");
         pc += 1;
         break;
       case "jump": {
-        const target = labels.get(command.attrs.target);
+        const target = labels.get(normalizeLabel(command.attrs.target));
         if (target == null) {
           throw new Error(`Jump target "${command.attrs.target}" was not found.`);
         }
         pc = target;
         break;
       }
+      case "link":
+        pendingLinks.push({
+          text: command.text || "",
+          target: normalizeLabel(command.attrs?.target || ""),
+          storage: command.attrs?.storage || "",
+        });
+        pc += 1;
+        break;
+      case "s":
+        flushText(false, pc - 1);
+        frames.push(
+          snapshotState(
+            state,
+            "",
+            {
+              astIndex: pc,
+              label: currentLabel,
+            },
+            {
+              choices: pendingLinks,
+              choiceRuntime: {
+                state: cloneScenarioState(state),
+                label: currentLabel,
+              },
+            },
+          ),
+        );
+        return { frames, haltedOnChoice: pendingLinks.length > 0 };
+      case "cm":
+        textBuffer = "";
+        pc += 1;
+        break;
+      case "choice":
+        pendingLinks.push({
+          text: command.attrs?.text || command.text || "",
+          target: command.attrs?.target || "",
+          storage: command.attrs?.storage || "",
+        });
+        pc += 1;
+        break;
       case "chara_new":
         state.characters[command.attrs.name] = {
           name: command.attrs.name,
