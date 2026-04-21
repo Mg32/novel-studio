@@ -458,8 +458,12 @@ function App() {
       runPreview();
       return;
     }
+    if (frameIndex >= frames.length - 1) {
+      stopPreview();
+      return;
+    }
     advanceFrame();
-  }, [currentFrame, runPreview, advanceFrame]);
+  }, [currentFrame, frameIndex, frames.length, runPreview, stopPreview, advanceFrame]);
 
   const jumpToCurrentGui = useCallback(() => {
     const astIndex = currentFrame?.cursor?.astIndex;

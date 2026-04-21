@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Box, Flex, Text } from "@chakra-ui/react";
 
-function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, onAdvance, canAdvance }) {
+function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, onAdvance }) {
   const isWide = aspect === "16:9";
   const stageStyle = isWide ? { aspectRatio: "16 / 9" } : { aspectRatio: "9 / 16" };
   const fullMessage = frame?.message || "";
@@ -81,9 +81,7 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
       setDisplayMessage(fullMessage);
       return;
     }
-    if (canAdvance) {
-      onAdvance?.();
-    }
+    onAdvance?.();
   };
 
   return (
