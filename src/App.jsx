@@ -617,7 +617,6 @@ function App() {
 
             <Box flex="1" minH="0" overflow="hidden">
               <StageView
-                key={`stage-main-${frameIndex}-${currentFrame?.message || "empty"}`}
                 frame={currentFrame}
                 aspect={aspect}
                 isDark={isDark}
@@ -769,7 +768,6 @@ function App() {
               </TipIconButton>
             </Flex>
             <StageView
-              key={`stage-expanded-${frameIndex}-${currentFrame?.message || "empty"}`}
               frame={currentFrame}
               aspect={aspect}
               isDark={isDark}
