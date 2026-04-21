@@ -278,21 +278,18 @@ function App() {
       const source = value == null ? "" : String(value).trim();
       return source.startsWith("*") ? source.slice(1) : source;
     };
-    if (isGuiDirty) {
-      for (const scene of guiScenes) {
-        if (scene.label) {
-          set.add(denormalize(scene.label));
-        }
-      }
-      return [...set];
-    }
     for (const command of ast) {
       if (command.type === "tag" && command.tag === "label" && command.attrs?.name) {
         set.add(denormalize(command.attrs.name));
       }
     }
+    for (const scene of guiScenes) {
+      if (scene.label) {
+        set.add(denormalize(scene.label));
+      }
+    }
     return [...set];
-  }, [ast, guiScenes, isGuiDirty]);
+  }, [ast, guiScenes]);
   const characterNames = useMemo(() => {
     const set = new Set();
     if (isGuiDirty) {
@@ -732,6 +729,7 @@ function App() {
               {activeEditor === "gui" ? (
                 <LabelEditor
                   scenes={scenes}
+                  labelOptions={labels}
                   onChange={updateByScenes}
                   isDark={isDark}
                   iconButtonStyle={iconButtonStyle}

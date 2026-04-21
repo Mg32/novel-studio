@@ -9,6 +9,7 @@ export const COMMAND_OPTIONS = [
   "chara_new",
   "chara_show",
   "chara_hide",
+  "l",
   "s",
   "cm",
   "r",
@@ -18,27 +19,27 @@ export const EDITOR_FONT =
   "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 
 export const BG_TEMPLATE_OPTIONS = [
-  { label: "日常（室内） / リビング", path: "templates/backgrounds/living_room.svg" },
-  { label: "日常（室内） / キッチン", path: "templates/backgrounds/kitchen.svg" },
-  { label: "日常（室内） / 風呂場", path: "templates/backgrounds/bathroom.svg" },
-  { label: "日常（室内） / 玄関", path: "templates/backgrounds/entrance.svg" },
-  { label: "日常（室内） / マンションの廊下", path: "templates/backgrounds/apartment_hallway.svg" },
-  { label: "日常（室内） / 一軒家の前", path: "templates/backgrounds/house_front.svg" },
-  { label: "日常（室内） / 自室（昼）", path: "templates/backgrounds/room_day.svg" },
-  { label: "日常（室内） / 自室（夜）", path: "templates/backgrounds/room_night.svg" },
-  { label: "日常（屋外） / 公園", path: "templates/backgrounds/park.svg" },
-  { label: "日常（屋外） / 橋", path: "templates/backgrounds/bridge.svg" },
-  { label: "日常（屋外） / 路地裏", path: "templates/backgrounds/alley.svg" },
-  { label: "日常（屋外） / コンビニ", path: "templates/backgrounds/convenience_store.svg" },
-  { label: "日常（屋外） / 繁華街", path: "templates/backgrounds/night_city.svg" },
-  { label: "日常（屋外） / 商店街", path: "templates/backgrounds/shopping_street.svg" },
-  { label: "日常（屋外） / バス停", path: "templates/backgrounds/bus_stop.svg" },
-  { label: "日常（屋外） / 川沿い", path: "templates/backgrounds/riverside.svg" },
-  { label: "日常（屋外） / 海", path: "templates/backgrounds/sea.svg" },
-  { label: "日常（屋外） / 雪景色", path: "templates/backgrounds/snow_landscape.svg" },
-  { label: "日常（屋外） / 駅（外）", path: "templates/backgrounds/station_outside.svg" },
-  { label: "日常（屋外） / 駅（プラットフォーム）", path: "templates/backgrounds/station_platform.svg" },
-  { label: "日常（屋外） / カフェ", path: "templates/backgrounds/cafe.svg" },
+  { label: "日常（室内）/ リビング", path: "templates/backgrounds/living_room.svg" },
+  { label: "日常（室内）/ キッチン", path: "templates/backgrounds/kitchen.svg" },
+  { label: "日常（室内）/ 風呂場", path: "templates/backgrounds/bathroom.svg" },
+  { label: "日常（室内）/ 玄関", path: "templates/backgrounds/entrance.svg" },
+  { label: "日常（室内）/ マンションの廊下", path: "templates/backgrounds/apartment_hallway.svg" },
+  { label: "日常（室内）/ 一軒家の前", path: "templates/backgrounds/house_front.svg" },
+  { label: "日常（室内）/ 自室（昼）", path: "templates/backgrounds/room_day.svg" },
+  { label: "日常（室内）/ 自室（夜）", path: "templates/backgrounds/room_night.svg" },
+  { label: "日常（屋外）/ 公園", path: "templates/backgrounds/park.svg" },
+  { label: "日常（屋外）/ 橋", path: "templates/backgrounds/bridge.svg" },
+  { label: "日常（屋外）/ 路地裏", path: "templates/backgrounds/alley.svg" },
+  { label: "日常（屋外）/ コンビニ", path: "templates/backgrounds/convenience_store.svg" },
+  { label: "日常（屋外）/ 繁華街", path: "templates/backgrounds/night_city.svg" },
+  { label: "日常（屋外）/ 商店街", path: "templates/backgrounds/shopping_street.svg" },
+  { label: "日常（屋外）/ バス停", path: "templates/backgrounds/bus_stop.svg" },
+  { label: "日常（屋外）/ 川沿い", path: "templates/backgrounds/riverside.svg" },
+  { label: "日常（屋外）/ 海", path: "templates/backgrounds/sea.svg" },
+  { label: "日常（屋外）/ 雪景色", path: "templates/backgrounds/snow_landscape.svg" },
+  { label: "日常（屋外）/ 駅（外）", path: "templates/backgrounds/station_outside.svg" },
+  { label: "日常（屋外）/ 駅（プラットフォーム）", path: "templates/backgrounds/station_platform.svg" },
+  { label: "日常（屋外）/ カフェ", path: "templates/backgrounds/cafe.svg" },
   { label: "学園系 / 教室（昼）", path: "templates/backgrounds/classroom_day.svg" },
   { label: "学園系 / 教室（夕）", path: "templates/backgrounds/classroom_evening.svg" },
   { label: "学園系 / 廊下", path: "templates/backgrounds/school_hallway.svg" },
@@ -49,7 +50,7 @@ export const BG_TEMPLATE_OPTIONS = [
   { label: "学園系 / 保健室", path: "templates/backgrounds/infirmary.svg" },
   { label: "学園系 / 部室", path: "templates/backgrounds/club_room.svg" },
   { label: "学園系 / 通学路", path: "templates/backgrounds/school_route.svg" },
-  { label: "学園系 / 建物の屋上", path: "templates/backgrounds/rooftop.svg" },
+  { label: "学園系 / 屋上", path: "templates/backgrounds/rooftop.svg" },
   { label: "会社系 / オフィス", path: "templates/backgrounds/office.svg" },
   { label: "会社系 / 会議室", path: "templates/backgrounds/meeting_room.svg" },
   { label: "会社系 / 病院の受付", path: "templates/backgrounds/hospital_reception.svg" },
@@ -72,22 +73,22 @@ export const BG_TEMPLATE_OPTIONS = [
 ];
 
 export const CHARA_TEMPLATE_OPTIONS = [
-  { label: "人物 / 主人公（男性・短髪）", path: "templates/characters/protagonist_male.svg" },
-  { label: "人物 / 主人公（女性・ロング）", path: "templates/characters/protagonist_female.svg" },
-  { label: "人物 / ヒロイン（ツインテール）", path: "templates/characters/heroine.svg" },
-  { label: "人物 / 親友（ポニーテール）", path: "templates/characters/best_friend.svg" },
-  { label: "人物 / ライバル（逆立ちヘア）", path: "templates/characters/rival.svg" },
-  { label: "人物 / 大人キャラ（整った短髪）", path: "templates/characters/adult_teacher.svg" },
-  { label: "人物 / 謎の人物（前髪長め）", path: "templates/characters/mysterious.svg" },
-  { label: "人物 / モブA（坊主）", path: "templates/characters/mob_a.svg" },
-  { label: "人物 / モブB（くせ毛）", path: "templates/characters/mob_b.svg" },
-  { label: "人物 / モブC（片編み）", path: "templates/characters/mob_c.svg" },
-  { label: "物語ポジション / 師匠", path: "templates/characters/master.svg" },
-  { label: "物語ポジション / 弟子", path: "templates/characters/apprentice.svg" },
-  { label: "物語ポジション / 黒幕", path: "templates/characters/mastermind.svg" },
-  { label: "物語ポジション / 情報屋", path: "templates/characters/informant.svg" },
-  { label: "物語ポジション / 被害者", path: "templates/characters/victim.svg" },
-  { label: "物語ポジション / 容疑者", path: "templates/characters/suspect.svg" },
+  { label: "役割 / 主人公（男性）", path: "templates/characters/protagonist_male.svg" },
+  { label: "役割 / 主人公（女性）", path: "templates/characters/protagonist_female.svg" },
+  { label: "役割 / ヒロイン", path: "templates/characters/heroine.svg" },
+  { label: "役割 / 親友", path: "templates/characters/best_friend.svg" },
+  { label: "役割 / ライバル", path: "templates/characters/rival.svg" },
+  { label: "役割 / 大人キャラ", path: "templates/characters/adult_teacher.svg" },
+  { label: "役割 / 謎の人物", path: "templates/characters/mysterious.svg" },
+  { label: "役割 / モブA", path: "templates/characters/mob_a.svg" },
+  { label: "役割 / モブB", path: "templates/characters/mob_b.svg" },
+  { label: "役割 / モブC", path: "templates/characters/mob_c.svg" },
+  { label: "役割 / 師匠", path: "templates/characters/master.svg" },
+  { label: "役割 / 弟子", path: "templates/characters/apprentice.svg" },
+  { label: "役割 / 黒幕", path: "templates/characters/mastermind.svg" },
+  { label: "役割 / 情報屋", path: "templates/characters/informant.svg" },
+  { label: "役割 / 被害者", path: "templates/characters/victim.svg" },
+  { label: "役割 / 容疑者", path: "templates/characters/suspect.svg" },
   { label: "年齢 / 幼児", path: "templates/characters/toddler.svg" },
   { label: "年齢 / 子ども", path: "templates/characters/child.svg" },
   { label: "年齢 / 青年", path: "templates/characters/young_adult.svg" },
@@ -98,15 +99,31 @@ export const CHARA_TEMPLATE_OPTIONS = [
   { label: "その他 / 動物", path: "templates/characters/animal.svg" },
 ];
 
-export const DEFAULT_SCRIPT = `[label name=start]
+export const DEFAULT_SCRIPT = `*start
 [bg storage=/novel-studio/templates/backgrounds/club_room.svg]
 [chara_new storage=/novel-studio/templates/characters/protagonist_female.svg name=チサキ]
 [chara_show name=チサキ]
-[label name=scene1]
+*scene1
 #チサキ
 今日はどうしたの？[p]
 #ショーマ
-いや、なんでもないよ[p]
-#
-[chara_hide name=チサキ]
-[p]`;
+そうだな・・・[l]
+[link target=*option1]相談がある[endlink]
+[link target=*option2]帰りたい[endlink]
+[s]
+*option1
+#ショーマ
+数学の課題で相談したいんだけど、いいかな？[p]
+#チサキ
+もちろん！[p]
+[jump target=*common]
+*option2
+#ショーマ
+そろそろ帰ろうと思ってるんだ[p]
+#チサキ
+そうしよっか[p]
+[jump target=*common]
+*common
+#チサキ
+ところで、かのんには会った？[p]
+ショーマを探していたみたいだけど・・・[p]`;

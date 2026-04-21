@@ -41,6 +41,7 @@ const SortableLabel = memo(function SortableLabel({
   id,
   labelData,
   labelIndex,
+  labelOptions,
   isOpen,
   isDark,
   iconButtonStyle,
@@ -156,6 +157,7 @@ const SortableLabel = memo(function SortableLabel({
                     onDelete={() => onCommandDelete(commandIndex)}
                     onAddAfter={() => onCommandAddAfter(commandIndex)}
                     errorMessage={commandErrors?.[commandIndex] || ""}
+                    labelOptions={labelOptions}
                     characterNameOptions={characterNameOptions}
                   />
                 ))}
@@ -171,6 +173,7 @@ const SortableLabel = memo(function SortableLabel({
   prev.id === next.id &&
   prev.labelData === next.labelData &&
   prev.labelIndex === next.labelIndex &&
+  prev.labelOptions === next.labelOptions &&
   prev.isOpen === next.isOpen &&
   prev.isDark === next.isDark &&
   prev.iconButtonStyle === next.iconButtonStyle &&
@@ -181,6 +184,7 @@ const SortableLabel = memo(function SortableLabel({
 const SortableCommand = memo(function SortableCommand({
   id,
   command,
+  labelOptions,
   isDark,
   iconButtonStyle,
   onChange,
@@ -207,6 +211,7 @@ const SortableCommand = memo(function SortableCommand({
       <CommandEditor
         command={command}
         errorMessage={errorMessage}
+        labelOptions={labelOptions}
         characterNameOptions={characterNameOptions}
         isDark={isDark}
         iconButtonStyle={iconButtonStyle}
@@ -222,6 +227,7 @@ const SortableCommand = memo(function SortableCommand({
   prev.id === next.id &&
   prev.command === next.command &&
   prev.errorMessage === next.errorMessage &&
+  prev.labelOptions === next.labelOptions &&
   prev.characterNameOptions === next.characterNameOptions &&
   prev.isDark === next.isDark &&
   prev.iconButtonStyle === next.iconButtonStyle,
@@ -229,6 +235,7 @@ const SortableCommand = memo(function SortableCommand({
 
 const LabelEditor = memo(function LabelEditor({
   scenes,
+  labelOptions,
   onChange,
   isDark,
   iconButtonStyle,
@@ -352,6 +359,7 @@ const LabelEditor = memo(function LabelEditor({
                 id={labelIds[labelIndex]}
                 labelData={scene}
                 labelIndex={labelIndex}
+                labelOptions={labelOptions}
                 isOpen={normalizedOpenLabelIds.includes(labelIds[labelIndex])}
                 isDark={isDark}
                 iconButtonStyle={iconButtonStyle}

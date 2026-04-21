@@ -7,6 +7,8 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
   const fullMessage = frame?.message || "";
   const [displayMessage, setDisplayMessage] = useState("");
   const timerRef = useRef(null);
+  const displaySetTimerRef = useRef(null);
+  const prevFullMessageRef = useRef("");
   const stageRef = useRef(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
@@ -15,11 +17,40 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (!frame || fullMessage.length === 0) {
+    if (displaySetTimerRef.current) {
+      clearTimeout(displaySetTimerRef.current);
+      displaySetTimerRef.current = null;
+    }
+    if (!frame) {
+      displaySetTimerRef.current = setTimeout(() => {
+        setDisplayMessage("");
+        displaySetTimerRef.current = null;
+      }, 0);
+      prevFullMessageRef.current = "";
+      return undefined;
+    }
+    if (fullMessage.length === 0) {
+      displaySetTimerRef.current = setTimeout(() => {
+        setDisplayMessage("");
+        displaySetTimerRef.current = null;
+      }, 0);
+      prevFullMessageRef.current = "";
       return undefined;
     }
 
-    let index = 0;
+    const previousFull = prevFullMessageRef.current || "";
+    const startIndex = fullMessage.startsWith(previousFull) ? previousFull.length : 0;
+    displaySetTimerRef.current = setTimeout(() => {
+      setDisplayMessage(fullMessage.slice(0, startIndex));
+      displaySetTimerRef.current = null;
+    }, 0);
+    prevFullMessageRef.current = fullMessage;
+
+    if (startIndex >= fullMessage.length) {
+      return undefined;
+    }
+
+    let index = startIndex;
     timerRef.current = setInterval(() => {
       index += 1;
       setDisplayMessage(fullMessage.slice(0, index));
@@ -33,6 +64,10 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      if (displaySetTimerRef.current) {
+        clearTimeout(displaySetTimerRef.current);
+        displaySetTimerRef.current = null;
       }
     };
   }, [frame, fullMessage]);
@@ -127,12 +162,35 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
               ))}
             </Flex>
             <Box position="absolute" insetX="2" bottom="2" display="flex" flexDirection="column" gap="1.5">
+              {frame.choices?.length ? (
+                <Flex direction="column" gap="1.5" zIndex="3" onPointerUp={(event) => event.stopPropagation()}>
+                  {frame.choices.map((choice, index) => (
+                    <Button
+                      key={`${choice.target}-${index}`}
+                      justifyContent="flex-start"
+                      h="auto"
+                      minH={{ base: "11", md: "10" }}
+                      py={{ base: "2.5", md: "2" }}
+                      px={{ base: "3", md: "3" }}
+                      bg={isDark ? "rgba(30,41,59,0.78)" : "rgba(15,23,42,0.72)"}
+                      color="whiteAlpha.950"
+                      boxShadow="sm"
+                      _hover={{ bg: isDark ? "rgba(30,41,59,0.88)" : "rgba(15,23,42,0.84)" }}
+                      fontSize={messageFontSize}
+                      onClick={() => onSelectChoice?.(choice.target)}
+                    >
+                      {choice.text || "(choice)"}
+                    </Button>
+                  ))}
+                </Flex>
+              ) : null}
               {frame.speaker ? (
                 <Box
                   alignSelf="flex-start"
                   rounded="md"
                   px="2"
                   py="1"
+                  zIndex="2"
                   bg={isDark ? "rgba(17,24,39,0.95)" : "rgba(255,255,255,0.95)"}
                 >
                   <Text fontSize={speakerFontSize} fontWeight="semibold" color={isDark ? "gray.100" : "gray.800"}>
@@ -144,29 +202,13 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
                 rounded="md"
                 bg={isDark ? "rgba(17,24,39,0.9)" : "rgba(255,255,255,0.9)"}
                 p="2"
+                zIndex="1"
                 minH={messageBoxMinHeight}
               >
                 <Text whiteSpace="pre-wrap" fontSize={messageFontSize} color={isDark ? "gray.100" : "gray.800"}>
                   {fullMessage.length === 0 ? "" : displayMessage}
                 </Text>
               </Box>
-              {frame.choices?.length ? (
-                <Flex direction="column" gap="1.5" onPointerUp={(event) => event.stopPropagation()}>
-                  {frame.choices.map((choice, index) => (
-                    <Button
-                      key={`${choice.target}-${index}`}
-                      size="sm"
-                      justifyContent="flex-start"
-                      bg={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
-                      color={isDark ? "gray.100" : "gray.800"}
-                      _hover={{ bg: isDark ? "whiteAlpha.300" : "blackAlpha.200" }}
-                      onClick={() => onSelectChoice?.(choice.target)}
-                    >
-                      {choice.text || "(choice)"}
-                    </Button>
-                  ))}
-                </Flex>
-              ) : null}
             </Box>
           </>
         ) : (

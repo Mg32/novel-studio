@@ -1,5 +1,4 @@
 const SUPPORTED_TAGS = new Set([
-  "label",
   "jump",
   "link",
   "chara_new",
@@ -8,12 +7,12 @@ const SUPPORTED_TAGS = new Set([
   "bg",
   "s",
   "cm",
+  "l",
   "p",
   "r",
 ]);
 
 const REQUIRED_ATTRS = {
-  label: ["name"],
   jump: ["target"],
   link: ["target"],
   chara_new: ["name", "storage"],
@@ -22,6 +21,7 @@ const REQUIRED_ATTRS = {
   bg: ["storage"],
   s: [],
   cm: [],
+  l: [],
   p: [],
   r: [],
 };
@@ -202,7 +202,7 @@ function ensureTextEndsWithPageBreak(value) {
   if (source.trim().length === 0) {
     return "[p]";
   }
-  return /\[p\]\s*$/.test(source) ? source : `${source}[p]`;
+  return /\[(p|l)\]\s*$/.test(source) ? source : `${source}[p]`;
 }
 
 export function parseScript(text) {
@@ -215,12 +215,37 @@ export function parseScript(text) {
     startLine: 0,
     speaker: "",
   };
+  const pendingLink = {
+    command: null,
+    lines: [],
+    line: 0,
+  };
   let currentSpeaker = "";
 
   for (let i = 0; i < lines.length; i += 1) {
     const lineNo = i + 1;
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
+
+    if (pendingLink.command) {
+      if (trimmed === "[endlink]") {
+        pushPendingText(ast, pending);
+        ast.push({
+          ...pendingLink.command,
+          text: pendingLink.lines.join("\n"),
+        });
+        pendingLink.command = null;
+        pendingLink.lines = [];
+        pendingLink.line = 0;
+        continue;
+      }
+      if (trimmed === "[r]") {
+        pendingLink.lines.push("");
+        continue;
+      }
+      pendingLink.lines.push(rawLine);
+      continue;
+    }
 
     if (!trimmed) {
       if (pending.lines.length > 0) {
@@ -260,6 +285,14 @@ export function parseScript(text) {
       continue;
     }
 
+    if (trimmed === "[endlink]") {
+      diagnostics.push({
+        line: lineNo,
+        message: "Unexpected [endlink] without [link].",
+      });
+      continue;
+    }
+
     if (trimmed.startsWith("@")) {
       pushPendingText(ast, pending);
       const parsedAt = parseAtTag(trimmed, lineNo);
@@ -281,8 +314,19 @@ export function parseScript(text) {
       const parsed = parseTag(trimmed, lineNo);
       diagnostics.push(...parsed.diagnostics);
       if (parsed.command) {
+        if (parsed.command.tag === "link") {
+          pendingLink.command = parsed.command;
+          pendingLink.lines = [];
+          pendingLink.line = lineNo;
+          continue;
+        }
         if (parsed.command.tag === "p") {
           appendTextSegment(pending, "[p]", lineNo, currentSpeaker);
+          pushPendingText(ast, pending);
+          continue;
+        }
+        if (parsed.command.tag === "l") {
+          appendTextSegment(pending, "[l]", lineNo, currentSpeaker);
           pushPendingText(ast, pending);
           continue;
         }
@@ -301,12 +345,20 @@ export function parseScript(text) {
     while (rest.length > 0) {
       const pIndex = rest.indexOf("[p]");
       const rIndex = rest.indexOf("[r]");
+      const lIndex = rest.indexOf("[l]");
 
       let nextIndex = -1;
       let nextToken = "";
-      if (pIndex >= 0 && (rIndex < 0 || pIndex < rIndex)) {
+      if (
+        pIndex >= 0 &&
+        (rIndex < 0 || pIndex < rIndex) &&
+        (lIndex < 0 || pIndex < lIndex)
+      ) {
         nextIndex = pIndex;
         nextToken = "[p]";
+      } else if (lIndex >= 0 && (rIndex < 0 || lIndex < rIndex)) {
+        nextIndex = lIndex;
+        nextToken = "[l]";
       } else if (rIndex >= 0) {
         nextIndex = rIndex;
         nextToken = "[r]";
@@ -324,6 +376,9 @@ export function parseScript(text) {
       if (nextToken === "[r]") {
         appendTextSegment(pending, segment, lineNo, currentSpeaker);
         pending.lines.push("");
+      } else if (nextToken === "[l]") {
+        appendTextSegment(pending, `${segment}[l]`, lineNo, currentSpeaker);
+        pushPendingText(ast, pending);
       } else {
         appendTextSegment(pending, `${segment}[p]`, lineNo, currentSpeaker);
         pushPendingText(ast, pending);
@@ -338,6 +393,16 @@ export function parseScript(text) {
   }
 
   pushPendingText(ast, pending);
+  if (pendingLink.command) {
+    ast.push({
+      ...pendingLink.command,
+      text: pendingLink.lines.join("\n"),
+    });
+    diagnostics.push({
+      line: pendingLink.line,
+      message: "Missing [endlink] for [link].",
+    });
+  }
 
   const labelLines = new Map();
   for (const command of ast) {
@@ -498,7 +563,7 @@ export function createEmptyCommand(tag = "text") {
   if (tag === "text") {
     return { type: "text", text: "" };
   }
-  if (tag === "p" || tag === "r") {
+  if (tag === "p" || tag === "r" || tag === "l") {
     return { type: "tag", tag, attrs: {} };
   }
   if (tag === "bg") {

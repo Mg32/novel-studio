@@ -80,12 +80,22 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
 
   const frames = [];
   let textBuffer = "";
+  let appendWithoutNewline = false;
+  let appendCarryLine = 0;
   let guard = 0;
   let currentLabel = initialLabel || "";
   let pendingLinks = [];
 
-  const flushText = (force, astIndex = null) => {
+  const flushText = (force, astIndex = null, clear = true) => {
     if (!force && textBuffer.length === 0) {
+      return;
+    }
+    if (frames.length > 0 && frames[frames.length - 1].message === textBuffer) {
+      if (clear) {
+        textBuffer = "";
+        appendWithoutNewline = false;
+        appendCarryLine = 0;
+      }
       return;
     }
     frames.push(
@@ -94,30 +104,43 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
         label: currentLabel,
       }),
     );
-    textBuffer = "";
+    if (clear) {
+      textBuffer = "";
+      appendWithoutNewline = false;
+      appendCarryLine = 0;
+    }
   };
 
   const appendText = (value) => {
     if (!value) {
       return;
     }
-    if (textBuffer.length > 0) {
+    if (textBuffer.length > 0 && !appendWithoutNewline) {
       textBuffer += "\n";
     }
+    appendWithoutNewline = false;
     textBuffer += value;
   };
 
-  const consumeTextWithTokens = (value, astIndex) => {
+  const consumeTextWithTokens = (value, astIndex, commandLine) => {
     let rest = value || "";
     while (rest.length > 0) {
       const pIndex = rest.indexOf("[p]");
       const rIndex = rest.indexOf("[r]");
+      const lIndex = rest.indexOf("[l]");
 
       let nextIndex = -1;
       let nextToken = "";
-      if (pIndex >= 0 && (rIndex < 0 || pIndex < rIndex)) {
+      if (
+        pIndex >= 0 &&
+        (rIndex < 0 || pIndex < rIndex) &&
+        (lIndex < 0 || pIndex < lIndex)
+      ) {
         nextIndex = pIndex;
         nextToken = "[p]";
+      } else if (lIndex >= 0 && (rIndex < 0 || lIndex < rIndex)) {
+        nextIndex = lIndex;
+        nextToken = "[l]";
       } else if (rIndex >= 0) {
         nextIndex = rIndex;
         nextToken = "[r]";
@@ -133,6 +156,12 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
 
       if (nextToken === "[r]") {
         textBuffer += "\n";
+        appendWithoutNewline = false;
+        appendCarryLine = 0;
+      } else if (nextToken === "[l]") {
+        flushText(true, astIndex, false);
+        appendWithoutNewline = true;
+        appendCarryLine = commandLine;
       } else {
         flushText(true, astIndex);
       }
@@ -155,7 +184,11 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
     }
 
     if (command.type === "text") {
-      consumeTextWithTokens(command.text, pc);
+      const commandLine = Number(command.line || 0);
+      if (!(appendWithoutNewline && appendCarryLine === commandLine)) {
+        appendWithoutNewline = false;
+      }
+      consumeTextWithTokens(command.text, pc, commandLine);
       pc += 1;
       continue;
     }
@@ -181,26 +214,50 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
         });
         pc += 1;
         break;
-      case "s":
+      case "s": {
+        if (pendingLinks.length === 0) {
+          pc += 1;
+          break;
+        }
         flushText(false, pc - 1);
+        const choiceMessage =
+          textBuffer.length > 0
+            ? textBuffer
+            : frames.length > 0
+              ? frames[frames.length - 1].message
+              : "";
+        const choicePayload = {
+          choices: pendingLinks,
+          choiceRuntime: {
+            state: cloneScenarioState(state),
+            label: currentLabel,
+          },
+        };
+        if (
+          pendingLinks.length > 0 &&
+          frames.length > 0 &&
+          frames[frames.length - 1].message === choiceMessage
+        ) {
+          const last = frames[frames.length - 1];
+          frames[frames.length - 1] = {
+            ...last,
+            ...choicePayload,
+          };
+          return { frames, haltedOnChoice: true };
+        }
         frames.push(
           snapshotState(
             state,
-            "",
+            choiceMessage,
             {
               astIndex: pc,
               label: currentLabel,
             },
-            {
-              choices: pendingLinks,
-              choiceRuntime: {
-                state: cloneScenarioState(state),
-                label: currentLabel,
-              },
-            },
+            choicePayload,
           ),
         );
         return { frames, haltedOnChoice: pendingLinks.length > 0 };
+      }
       case "cm":
         textBuffer = "";
         pc += 1;
@@ -248,10 +305,20 @@ export function runScenario({ ast, startAt = {}, initialState = null, initialLab
         break;
       case "r":
         textBuffer += "\n";
+        appendWithoutNewline = false;
+        appendCarryLine = 0;
+        pc += 1;
+        break;
+      case "l":
+        flushText(true, pc, false);
+        appendWithoutNewline = true;
+        appendCarryLine = Number(command.line || 0);
         pc += 1;
         break;
       case "p":
         flushText(true, pc);
+        appendWithoutNewline = false;
+        appendCarryLine = 0;
         pc += 1;
         break;
       default:

@@ -57,9 +57,9 @@ const AppSelect = memo(function AppSelect({ value, onChange, options, isDark, fo
             borderColor={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
             boxShadow={isDark ? "0 12px 28px rgba(0,0,0,0.55)" : "0 12px 28px rgba(15,23,42,0.14)"}
           >
-            {collection.items.map((item) => (
+            {collection.items.map((item, index) => (
               <Select.Item
-                key={item.value}
+                key={`${item.value}-${index}`}
                 item={item}
                 color={isDark ? "gray.300" : "gray.800"}
                 _highlighted={{

@@ -128,12 +128,21 @@ const commandTypeOptions = [
   { label: "chara_hide", value: "chara_hide" },
   { label: "s", value: "s" },
   { label: "cm", value: "cm" },
+  { label: "l", value: "l" },
   { label: "r", value: "r" },
 ];
 
 function toGuiTextValue(value) {
   const source = value == null ? "" : String(value);
   return source.replace(/\[p\]\s*$/, "");
+}
+
+function normalizeTargetLabel(value) {
+  const source = value == null ? "" : String(value).trim();
+  if (!source) {
+    return "";
+  }
+  return source.startsWith("*") ? source : `*${source}`;
 }
 
 const commandTypeIconMap = {
@@ -146,6 +155,7 @@ const commandTypeIconMap = {
   chara_show: FiEye,
   chara_hide: FiEyeOff,
   p: FiChevronsRight,
+  l: FiChevronsRight,
   r: FiChevronsRight,
 };
 
@@ -175,6 +185,7 @@ const CommandEditor = memo(function CommandEditor({
   onDelete,
   onAddAfter,
   errorMessage,
+  labelOptions,
   characterNameOptions,
   isDark,
   iconButtonStyle,
@@ -193,6 +204,26 @@ const CommandEditor = memo(function CommandEditor({
     () => [{ label: "name", value: "" }, ...characterNameOptions.map((name) => ({ label: name, value: name }))],
     [characterNameOptions],
   );
+  const jumpTargetOptions = useMemo(() => {
+    const seen = new Set();
+    const labels = [];
+    for (const rawName of labelOptions || []) {
+      const name = String(rawName || "").trim();
+      if (!name) {
+        continue;
+      }
+      const normalized = normalizeTargetLabel(name);
+      if (seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      labels.push({
+        label: name,
+        value: normalized,
+      });
+    }
+    return labels;
+  }, [labelOptions]);
   const currentCharaName = command.attrs?.name || "";
   const guiText = toGuiTextValue(command.text || "");
   const [textDraft, setTextDraft] = useState(guiText);
@@ -334,14 +365,17 @@ const CommandEditor = memo(function CommandEditor({
         )}
 
         {command.type === "tag" && command.tag === "jump" && (
-          <EditorInput
+          <AppSelect
+            value={
+              jumpTargetOptions.some((item) => item.value === normalizeTargetLabel(command.attrs.target || ""))
+                ? normalizeTargetLabel(command.attrs.target || "")
+                : ""
+            }
+            onChange={(nextValue) => setAttr("target", normalizeTargetLabel(nextValue))}
+            options={jumpTargetOptions}
             isDark={isDark}
-            bg={isDark ? "gray.800" : "white"}
-            color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
-            value={command.attrs.target || ""}
             placeholder="*target label"
-            onChange={(event) => setAttr("target", event.target.value)}
           />
         )}
 
@@ -356,14 +390,17 @@ const CommandEditor = memo(function CommandEditor({
               placeholder="choice text"
               onChange={(event) => onChange({ ...command, text: event.target.value })}
             />
-            <EditorInput
+            <AppSelect
+              value={
+                jumpTargetOptions.some((item) => item.value === normalizeTargetLabel(command.attrs.target || ""))
+                  ? normalizeTargetLabel(command.attrs.target || "")
+                  : ""
+              }
+              onChange={(nextValue) => setAttr("target", normalizeTargetLabel(nextValue))}
+              options={jumpTargetOptions}
               isDark={isDark}
-              bg={isDark ? "gray.800" : "white"}
-              color={isDark ? "gray.100" : "gray.900"}
               fontFamily={EDITOR_FONT}
-              value={command.attrs.target || ""}
               placeholder="*target label"
-              onChange={(event) => setAttr("target", event.target.value)}
             />
           </Grid>
         )}
@@ -443,6 +480,7 @@ const CommandEditor = memo(function CommandEditor({
 (prev, next) =>
   prev.command === next.command &&
   prev.errorMessage === next.errorMessage &&
+  prev.labelOptions === next.labelOptions &&
   prev.characterNameOptions === next.characterNameOptions &&
   prev.isDark === next.isDark &&
   prev.iconButtonStyle === next.iconButtonStyle,
