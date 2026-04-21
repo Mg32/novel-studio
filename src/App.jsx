@@ -470,9 +470,18 @@ function App() {
       if (!runtime?.state) {
         return;
       }
+      let scenarioAst = isGuiDirty ? buildAstFromScenes(guiScenes) : ast;
+      if (isGuiDirty) {
+        const parsedFromGui = parseScript(serializeScript(scenarioAst));
+        if (parsedFromGui.diagnostics.length > 0) {
+          setRunError("Fix parser errors.");
+          return;
+        }
+        scenarioAst = parsedFromGui.ast;
+      }
       try {
         const result = runScenario({
-          ast,
+          ast: scenarioAst,
           startAt: { label: targetLabel },
           initialState: runtime.state,
           initialLabel: runtime.label || currentFrame?.cursor?.label || "",
@@ -484,7 +493,7 @@ function App() {
         setRunError(error.message);
       }
     },
-    [currentFrame, ast],
+    [currentFrame, ast, isGuiDirty, buildAstFromScenes, guiScenes],
   );
 
   const jumpToCurrentGui = useCallback(() => {
