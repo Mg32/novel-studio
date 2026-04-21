@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { Portal, Select, createListCollection } from "@chakra-ui/react";
 
-function AppSelect({ value, onChange, options, isDark, fontFamily, placeholder }) {
+const AppSelect = memo(function AppSelect({ value, onChange, options, isDark, fontFamily, placeholder }) {
   const collection = useMemo(
     () =>
       createListCollection({
@@ -12,13 +12,17 @@ function AppSelect({ value, onChange, options, isDark, fontFamily, placeholder }
       }),
     [options],
   );
+  const handleValueChange = useCallback(
+    (detail) => onChange(detail.value[0] ?? ""),
+    [onChange],
+  );
 
   return (
     <Select.Root
       size="sm"
       collection={collection}
       value={value ? [value] : []}
-      onValueChange={(detail) => onChange(detail.value[0] ?? "")}
+      onValueChange={handleValueChange}
       positioning={{ sameWidth: true }}
     >
       <Select.HiddenSelect />
@@ -49,6 +53,6 @@ function AppSelect({ value, onChange, options, isDark, fontFamily, placeholder }
       </Portal>
     </Select.Root>
   );
-}
+});
 
 export default AppSelect;

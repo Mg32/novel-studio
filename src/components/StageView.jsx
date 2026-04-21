@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Box, Flex, Text } from "@chakra-ui/react";
 
 function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, onAdvance, canAdvance }) {
@@ -162,4 +162,14 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
   );
 }
 
-export default StageView;
+export default memo(
+  StageView,
+  (prev, next) =>
+    prev.frame === next.frame &&
+    prev.aspect === next.aspect &&
+    prev.isDark === next.isDark &&
+    prev.maxHeight === next.maxHeight &&
+    prev.emptyMessage === next.emptyMessage &&
+    prev.canAdvance === next.canAdvance &&
+    prev.onAdvance === next.onAdvance,
+);

@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { IconButton, Portal, Tooltip } from "@chakra-ui/react";
 
-function TipIconButton({ label, children, ...props }) {
+const TipIconButton = memo(function TipIconButton({ label, children, ...props }) {
   return (
     <Tooltip.Root openDelay={180} closeDelay={70} positioning={{ placement: "top" }}>
       <Tooltip.Trigger asChild>
@@ -15,6 +16,6 @@ function TipIconButton({ label, children, ...props }) {
       </Portal>
     </Tooltip.Root>
   );
-}
+});
 
 export default TipIconButton;

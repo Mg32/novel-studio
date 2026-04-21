@@ -213,7 +213,7 @@ const SortableCommand = memo(function SortableCommand({
   prev.iconButtonStyle === next.iconButtonStyle,
 );
 
-function LabelEditor({
+const LabelEditor = memo(function LabelEditor({
   scenes,
   onChange,
   isDark,
@@ -412,6 +412,6 @@ function LabelEditor({
       ) : null}
     </Flex>
   );
-}
+});
 
 export default LabelEditor;

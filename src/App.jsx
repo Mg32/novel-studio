@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Flex, Grid, Portal, Tabs, Text, Textarea, Tooltip, useMediaQuery } from "@chakra-ui/react";
+import { Box, Flex, Grid, Portal, Tabs, Text, Tooltip, useMediaQuery } from "@chakra-ui/react";
 import { FiColumns, FiCopy, FiCrosshair, FiEdit3, FiExternalLink, FiGrid, FiMonitor, FiPlay, FiShare2, FiSquare, FiX } from "react-icons/fi";
 import { astToScenes, parseScript, scenesToAst, serializeScript } from "./lib/script";
 import { runScenario } from "./lib/runner";
@@ -9,6 +9,7 @@ import AppSelect from "./components/AppSelect";
 import TipIconButton from "./components/TipIconButton";
 import LabelEditor from "./components/LabelEditor";
 import StageView from "./components/StageView";
+import TextScriptEditor from "./components/TextScriptEditor";
 
 function buildAstIndexToGuiLocation(ast) {
   const map = new Map();
@@ -105,7 +106,6 @@ function App() {
   const [ast, setAst] = useState([]);
   const [diagnostics, setDiagnostics] = useState([]);
   const [isGuiDirty, setIsGuiDirty] = useState(false);
-  const [isTextDirty, setIsTextDirty] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [startLabel, setStartLabel] = useState("");
   const [aspect, setAspect] = useState("16:9");
@@ -115,8 +115,8 @@ function App() {
   const [runError, setRunError] = useState("");
   const [jumpToGuiTarget, setJumpToGuiTarget] = useState(null);
   const toastTimerRef = useRef(null);
-  const textParseTimerRef = useRef(null);
   const storageTimerRef = useRef(null);
+  const textEditorRef = useRef(null);
 
   const iconButtonStyle = useMemo(
     () =>
@@ -149,6 +149,22 @@ function App() {
     }),
     [],
   );
+  const runButtonProps = useMemo(
+    () => ({
+      bg: isDark ? "blue.700" : "blue.500",
+      color: "white",
+      _hover: { bg: isDark ? "blue.600" : "blue.600" },
+    }),
+    [isDark],
+  );
+  const subtleButtonProps = useMemo(
+    () => ({
+      bg: isDark ? "whiteAlpha.100" : "blackAlpha.100",
+      color: isDark ? "gray.100" : "gray.800",
+      _hover: { bg: isDark ? "whiteAlpha.200" : "blackAlpha.200" },
+    }),
+    [isDark],
+  );
 
   const applyText = useCallback((nextText) => {
     const parsed = parseScript(nextText);
@@ -158,7 +174,7 @@ function App() {
     setGuiScenes(nextScenes);
     setDiagnostics(parsed.diagnostics);
     setIsGuiDirty(false);
-    setIsTextDirty(false);
+    return parsed;
   }, []);
 
   const buildAstFromScenes = useCallback((sourceScenes = guiScenes) => scenesToAst(sourceScenes), [guiScenes]);
@@ -173,23 +189,6 @@ function App() {
       return { nextAst, nextText };
     },
     [guiScenes],
-  );
-
-  const flushTextParse = useCallback(
-    (sourceText = scriptText) => {
-      if (textParseTimerRef.current) {
-        clearTimeout(textParseTimerRef.current);
-        textParseTimerRef.current = null;
-      }
-      const parsed = parseScript(sourceText);
-      const nextScenes = astToScenes(parsed.ast);
-      setAst(parsed.ast);
-      setGuiScenes(nextScenes);
-      setDiagnostics(parsed.diagnostics);
-      setIsTextDirty(false);
-      return parsed;
-    },
-    [scriptText],
   );
 
   useEffect(() => {
@@ -221,30 +220,6 @@ function App() {
   }, [applyText]);
 
   useEffect(() => {
-    if (activeEditor !== "text" || !isTextDirty) {
-      return undefined;
-    }
-    if (textParseTimerRef.current) {
-      clearTimeout(textParseTimerRef.current);
-    }
-    textParseTimerRef.current = setTimeout(() => {
-      const parsed = parseScript(scriptText);
-      const nextScenes = astToScenes(parsed.ast);
-      setAst(parsed.ast);
-      setGuiScenes(nextScenes);
-      setDiagnostics(parsed.diagnostics);
-      setIsTextDirty(false);
-      textParseTimerRef.current = null;
-    }, 140);
-    return () => {
-      if (textParseTimerRef.current) {
-        clearTimeout(textParseTimerRef.current);
-        textParseTimerRef.current = null;
-      }
-    };
-  }, [activeEditor, isTextDirty, scriptText]);
-
-  useEffect(() => {
     if (!ready) {
       return undefined;
     }
@@ -271,7 +246,12 @@ function App() {
       return undefined;
     }
     const handleBeforeUnload = () => {
-      const textForStorage = isGuiDirty ? serializeScript(scenesToAst(guiScenes)) : scriptText;
+      const draftText = textEditorRef.current?.getValue?.();
+      const textForStorage = isGuiDirty
+        ? serializeScript(scenesToAst(guiScenes))
+        : typeof draftText === "string"
+          ? draftText
+          : scriptText;
       window.localStorage.setItem(STORAGE_KEY, textForStorage);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -339,6 +319,17 @@ function App() {
     }
     return [...set];
   }, [ast, guiScenes, activeEditor, isGuiDirty]);
+  const labelSelectOptions = useMemo(
+    () => [{ label: "label", value: "" }, ...labels.map((label) => ({ label, value: label }))],
+    [labels],
+  );
+  const aspectSelectOptions = useMemo(
+    () => [
+      { label: "16:9", value: "16:9" },
+      { label: "9:16", value: "9:16" },
+    ],
+    [],
+  );
 
   const updateByScenes = useCallback((nextScenes) => {
     setGuiScenes(nextScenes);
@@ -346,10 +337,18 @@ function App() {
     setDiagnostics([]);
   }, []);
 
-  const runPreview = () => {
-    const parsed = isTextDirty ? flushTextParse(scriptText) : null;
-    let previewAst = isGuiDirty ? buildAstFromScenes(guiScenes) : parsed?.ast ?? ast;
-    let currentDiagnostics = parsed?.diagnostics ?? diagnostics;
+  const runPreview = useCallback(() => {
+    const flushedText =
+      activeEditor === "text"
+        ? textEditorRef.current?.flush?.()
+        : null;
+    const parsedFromText =
+      typeof flushedText === "string" && flushedText !== scriptText
+        ? applyText(flushedText)
+        : null;
+
+    let previewAst = isGuiDirty ? buildAstFromScenes(guiScenes) : parsedFromText?.ast ?? ast;
+    let currentDiagnostics = parsedFromText?.diagnostics ?? diagnostics;
     if (isGuiDirty) {
       const previewText = serializeScript(previewAst);
       const parsedFromGui = parseScript(previewText);
@@ -373,27 +372,55 @@ function App() {
       setFrameIndex(0);
       setRunError(error.message);
     }
-  };
+  }, [
+    activeEditor,
+    scriptText,
+    applyText,
+    isGuiDirty,
+    buildAstFromScenes,
+    guiScenes,
+    ast,
+    diagnostics,
+    startLabel,
+  ]);
 
-  const stopPreview = () => {
+  const stopPreview = useCallback(() => {
     setFrames([]);
     setFrameIndex(0);
     setRunError("");
-  };
+  }, []);
 
-  const copyScript = async () => {
+  const copyScript = useCallback(async () => {
     try {
-      const text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      let text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      if (activeEditor === "text") {
+        const flushed = textEditorRef.current?.flush?.();
+        if (typeof flushed === "string") {
+          text = flushed;
+          if (flushed !== scriptText) {
+            applyText(flushed);
+          }
+        }
+      }
       await navigator.clipboard.writeText(text);
       setStatusMessage("Copied");
     } catch {
       setStatusMessage("Copy failed");
     }
-  };
+  }, [activeEditor, applyText, flushGuiToText, guiScenes, isGuiDirty, scriptText]);
 
-  const shareByUrl = async () => {
+  const shareByUrl = useCallback(async () => {
     try {
-      const text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      let text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      if (activeEditor === "text") {
+        const flushed = textEditorRef.current?.flush?.();
+        if (typeof flushed === "string") {
+          text = flushed;
+          if (flushed !== scriptText) {
+            applyText(flushed);
+          }
+        }
+      }
       const encoded = await encodeScenario(text);
       const url = new URL(window.location.href);
       url.searchParams.set("s", encoded);
@@ -403,7 +430,7 @@ function App() {
     } catch {
       setStatusMessage("Share failed");
     }
-  };
+  }, [activeEditor, applyText, flushGuiToText, guiScenes, isGuiDirty, scriptText]);
 
   const handleEditorTabChange = useCallback(
     (detail) => {
@@ -411,34 +438,30 @@ function App() {
       if (nextEditor === "text" && isGuiDirty) {
         flushGuiToText(guiScenes);
       }
-      if (nextEditor === "gui" && isTextDirty) {
-        flushTextParse(scriptText);
+      if (nextEditor === "gui" && activeEditor === "text") {
+        const flushed = textEditorRef.current?.flush?.();
+        if (typeof flushed === "string" && flushed !== scriptText) {
+          applyText(flushed);
+        }
       }
       setActiveEditor(nextEditor);
     },
-    [guiScenes, isGuiDirty, isTextDirty, flushGuiToText, flushTextParse, scriptText],
+    [guiScenes, isGuiDirty, flushGuiToText, activeEditor, scriptText, applyText],
   );
 
-  const handleTextChange = useCallback((event) => {
-    const nextText = event.target.value;
-    setScriptText(nextText);
-    setIsGuiDirty(false);
-    setIsTextDirty(true);
-  }, []);
-
-  const advanceFrame = () => {
+  const advanceFrame = useCallback(() => {
     setFrameIndex((index) => Math.min(index + 1, Math.max(frames.length - 1, 0)));
-  };
+  }, [frames.length]);
 
-  const handleStageTap = () => {
+  const handleStageTap = useCallback(() => {
     if (!currentFrame) {
       runPreview();
       return;
     }
     advanceFrame();
-  };
+  }, [currentFrame, runPreview, advanceFrame]);
 
-  const jumpToCurrentGui = () => {
+  const jumpToCurrentGui = useCallback(() => {
     const astIndex = currentFrame?.cursor?.astIndex;
     if (astIndex == null) {
       return;
@@ -456,7 +479,7 @@ function App() {
       ...location,
       nonce: Date.now(),
     });
-  };
+  }, [currentFrame, isGuiDirty, buildAstFromScenes, guiScenes, astIndexToGuiLocation]);
 
   useEffect(() => {
     if (!statusMessage) {
@@ -555,20 +578,14 @@ function App() {
               <AppSelect
                 value={startLabel}
                 onChange={setStartLabel}
-                options={[
-                  { label: "label", value: "" },
-                  ...labels.map((label) => ({ label, value: label })),
-                ]}
+                options={labelSelectOptions}
                 isDark={isDark}
                 placeholder="label"
               />
               <AppSelect
                 value={aspect}
                 onChange={setAspect}
-                options={[
-                  { label: "16:9", value: "16:9" },
-                  { label: "9:16", value: "9:16" },
-                ]}
+                options={aspectSelectOptions}
                 isDark={isDark}
               />
             </Grid>
@@ -576,9 +593,7 @@ function App() {
               <TipIconButton
                 label="Run"
                 size="sm"
-                bg={isDark ? "blue.700" : "blue.500"}
-                color="white"
-                _hover={{ bg: isDark ? "blue.600" : "blue.600" }}
+                {...runButtonProps}
                 onClick={runPreview}
               >
                 <FiPlay />
@@ -586,9 +601,7 @@ function App() {
               <TipIconButton
                 label="Stop"
                 size="sm"
-                bg={isDark ? "whiteAlpha.100" : "blackAlpha.100"}
-                color={isDark ? "gray.100" : "gray.800"}
-                _hover={{ bg: isDark ? "whiteAlpha.200" : "blackAlpha.200" }}
+                {...subtleButtonProps}
                 onClick={stopPreview}
               >
                 <FiSquare />
@@ -596,9 +609,7 @@ function App() {
               <TipIconButton
                 label="Jump to GUI"
                 size="sm"
-                bg={isDark ? "whiteAlpha.100" : "blackAlpha.100"}
-                color={isDark ? "gray.100" : "gray.800"}
-                _hover={{ bg: isDark ? "whiteAlpha.200" : "blackAlpha.200" }}
+                {...subtleButtonProps}
                 onClick={jumpToCurrentGui}
                 isDisabled={currentFrame?.cursor?.astIndex == null}
               >
@@ -700,19 +711,12 @@ function App() {
                   characterNameOptions={characterNames}
                 />
               ) : (
-                <Textarea
-                  size="sm"
-                  borderWidth="0"
-                  fontFamily={EDITOR_FONT}
-                  h="100%"
-                  minH="0"
-                  resize="none"
-                  overflow="auto"
+                <TextScriptEditor
+                  ref={textEditorRef}
                   value={scriptText}
-                  onChange={handleTextChange}
-                  bg={isDark ? "gray.800" : "white"}
-                  color={isDark ? "gray.100" : "gray.900"}
-                  _placeholder={{ color: isDark ? "gray.400" : "gray.500" }}
+                  onCommit={applyText}
+                  isDark={isDark}
+                  fontFamily={EDITOR_FONT}
                 />
               )}
 
@@ -756,10 +760,7 @@ function App() {
                 <AppSelect
                   value={aspect}
                   onChange={setAspect}
-                  options={[
-                    { label: "16:9", value: "16:9" },
-                    { label: "9:16", value: "9:16" },
-                  ]}
+                  options={aspectSelectOptions}
                   isDark={isDark}
                 />
               </Box>

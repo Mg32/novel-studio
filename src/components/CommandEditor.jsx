@@ -155,7 +155,6 @@ const CommandEditor = memo(function CommandEditor({
   const currentType =
     command.type === "text" ? "text" : command.type === "speaker" ? "speaker" : command.tag;
   const TypeIcon = commandTypeIconMap[currentType] ?? FiType;
-  const textCommitTimerRef = useRef(null);
   const isTextEditingRef = useRef(false);
   const latestCommandRef = useRef(command);
 
@@ -188,16 +187,6 @@ const CommandEditor = memo(function CommandEditor({
       onChange({ ...latestCommandRef.current, text: nextText });
     },
     [onChange],
-  );
-
-  useEffect(
-    () => () => {
-      if (textCommitTimerRef.current) {
-        clearTimeout(textCommitTimerRef.current);
-        textCommitTimerRef.current = null;
-      }
-    },
-    [],
   );
 
   return (
@@ -273,22 +262,10 @@ const CommandEditor = memo(function CommandEditor({
             }}
             onBlur={() => {
               isTextEditingRef.current = false;
-              if (textCommitTimerRef.current) {
-                clearTimeout(textCommitTimerRef.current);
-                textCommitTimerRef.current = null;
-              }
               commitText(textDraft);
             }}
             onChange={(event) => {
-              const nextText = event.target.value;
-              setTextDraft(nextText);
-              if (textCommitTimerRef.current) {
-                clearTimeout(textCommitTimerRef.current);
-              }
-              textCommitTimerRef.current = setTimeout(() => {
-                commitText(nextText);
-                textCommitTimerRef.current = null;
-              }, 180);
+              setTextDraft(event.target.value);
             }}
           />
         )}
