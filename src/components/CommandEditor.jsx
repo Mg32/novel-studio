@@ -195,6 +195,7 @@ const CommandEditor = memo(function CommandEditor({
     command.type === "text" ? "text" : command.type === "speaker" ? "speaker" : command.tag;
   const TypeIcon = commandTypeIconMap[currentType] ?? FiType;
   const isTextEditingRef = useRef(false);
+  const isSpeakerEditingRef = useRef(false);
   const latestCommandRef = useRef(command);
 
   const setAttr = (key, value) => {
@@ -226,7 +227,9 @@ const CommandEditor = memo(function CommandEditor({
   }, [labelOptions]);
   const currentCharaName = command.attrs?.name || "";
   const guiText = toGuiTextValue(command.text || "");
+  const guiSpeakerName = command.name || "";
   const [textDraft, setTextDraft] = useState(guiText);
+  const [speakerDraft, setSpeakerDraft] = useState(guiSpeakerName);
 
   useEffect(() => {
     latestCommandRef.current = command;
@@ -241,9 +244,24 @@ const CommandEditor = memo(function CommandEditor({
     }
   }, [currentType, guiText]);
 
+  useEffect(() => {
+    if (currentType !== "speaker") {
+      return;
+    }
+    if (!isSpeakerEditingRef.current) {
+      setSpeakerDraft(guiSpeakerName);
+    }
+  }, [currentType, guiSpeakerName]);
+
   const commitText = useCallback(
     (nextText) => {
       onChange({ ...latestCommandRef.current, text: nextText });
+    },
+    [onChange],
+  );
+  const commitSpeaker = useCallback(
+    (nextName) => {
+      onChange({ ...latestCommandRef.current, name: nextName });
     },
     [onChange],
   );
@@ -303,9 +321,16 @@ const CommandEditor = memo(function CommandEditor({
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
-            value={command.name || ""}
+            value={speakerDraft}
             placeholder="speaker"
-            onChange={(event) => onChange({ ...command, name: event.target.value })}
+            onFocus={() => {
+              isSpeakerEditingRef.current = true;
+            }}
+            onBlur={() => {
+              isSpeakerEditingRef.current = false;
+              commitSpeaker(speakerDraft);
+            }}
+            onChange={(event) => setSpeakerDraft(event.target.value)}
           />
         )}
 
