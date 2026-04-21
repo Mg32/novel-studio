@@ -94,6 +94,7 @@ function StageView({ frame, aspect, isDark, maxHeight = "58dvh", emptyMessage, o
         position="relative"
         overflow="hidden"
         rounded="md"
+        userSelect="none"
         bg="black"
         style={stageStyle}
         w={isWide ? "100%" : "auto"}
