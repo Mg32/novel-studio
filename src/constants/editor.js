@@ -100,10 +100,16 @@ export const CHARA_TEMPLATE_OPTIONS = [
 ];
 
 export const DEFAULT_SCRIPT = `*start
+テキストを入力していくだけで、[p]
+簡単にノベルゲームが作成できます[p]
+スマホでも動作しますので[l]
+アイデアスケッチ等にご活用ください[p]
+*scene1
 [bg storage=/novel-studio/templates/backgrounds/club_room.svg]
+#ショーマ
+あっ、チサキ[p]
 [chara_new storage=/novel-studio/templates/characters/protagonist_female.svg name=チサキ]
 [chara_show name=チサキ]
-*scene1
 #チサキ
 今日はどうしたの？[p]
 #ショーマ
