@@ -22,11 +22,24 @@ import {
 } from "../constants/editor";
 import { createEmptyCommand } from "../lib/script";
 
-function EditorInput(props) {
-  return <Input size="sm" borderWidth="0" {...props} />;
+function EditorInput({ isDark, ...props }) {
+  return (
+    <Input
+      size="sm"
+      borderWidth="1px"
+      borderColor={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
+      _hover={{ borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100" }}
+      cursor="text"
+      _focusVisible={{
+        boxShadow: "0 0 0 1px rgba(96,165,250,0.85)",
+        borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100",
+      }}
+      {...props}
+    />
+  );
 }
 
-function AutoResizeTextarea({ value, onChange, minRows = 2, ...props }) {
+function AutoResizeTextarea({ value, onChange, minRows = 2, isDark, ...props }) {
   const rows = useMemo(() => {
     const text = value == null ? "" : String(value);
     const lineCount = text.split("\n").length;
@@ -36,10 +49,17 @@ function AutoResizeTextarea({ value, onChange, minRows = 2, ...props }) {
   return (
     <Textarea
       size="sm"
-      borderWidth="0"
+      borderWidth="1px"
+      borderColor={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
+      _hover={{ borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100" }}
       resize="none"
       overflow="auto"
       rows={rows}
+      cursor="text"
+      _focusVisible={{
+        boxShadow: "0 0 0 1px rgba(96,165,250,0.85)",
+        borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100",
+      }}
       value={value}
       onChange={onChange}
       {...props}
@@ -240,6 +260,7 @@ const CommandEditor = memo(function CommandEditor({
       <Box ml="34px">
         {command.type === "speaker" && (
           <EditorInput
+            isDark={isDark}
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
@@ -251,6 +272,7 @@ const CommandEditor = memo(function CommandEditor({
 
         {command.type === "text" && (
           <AutoResizeTextarea
+            isDark={isDark}
             minRows={2}
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
@@ -274,6 +296,7 @@ const CommandEditor = memo(function CommandEditor({
           <Flex gap="2" align="stretch">
             <Flex direction="column" gap="2" flex="1" minW="0">
               <EditorInput
+                isDark={isDark}
                 bg={isDark ? "gray.800" : "white"}
                 color={isDark ? "gray.100" : "gray.900"}
                 fontFamily={EDITOR_FONT}
@@ -304,6 +327,7 @@ const CommandEditor = memo(function CommandEditor({
 
         {command.type === "tag" && command.tag === "jump" && (
           <EditorInput
+            isDark={isDark}
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
@@ -318,6 +342,7 @@ const CommandEditor = memo(function CommandEditor({
             <Flex direction="column" gap="2" flex="1" minW="0">
               <Grid templateColumns="1fr 1fr" gap="2">
                 <EditorInput
+                  isDark={isDark}
                   bg={isDark ? "gray.800" : "white"}
                   color={isDark ? "gray.100" : "gray.900"}
                   fontFamily={EDITOR_FONT}
@@ -326,6 +351,7 @@ const CommandEditor = memo(function CommandEditor({
                   onChange={(event) => setAttr("name", event.target.value)}
                 />
                 <EditorInput
+                  isDark={isDark}
                   bg={isDark ? "gray.800" : "white"}
                   color={isDark ? "gray.100" : "gray.900"}
                   fontFamily={EDITOR_FONT}

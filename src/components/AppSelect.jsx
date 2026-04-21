@@ -29,21 +29,48 @@ const AppSelect = memo(function AppSelect({ value, onChange, options, isDark, fo
       <Select.Control>
         <Select.Trigger
           bg={isDark ? "gray.800" : "white"}
-          color={isDark ? "gray.100" : "gray.900"}
+          color={isDark ? "gray.400" : "gray.700"}
           borderWidth="0"
           fontFamily={fontFamily}
+          cursor="pointer"
+          pe="0"
+          _focusVisible={{
+            boxShadow: isDark ? "0 0 0 1px rgba(96,165,250,0.85)" : "0 0 0 1px rgba(37,99,235,0.75)",
+          }}
         >
           <Select.ValueText placeholder={placeholder} />
         </Select.Trigger>
-        <Select.IndicatorGroup>
-          <Select.Indicator />
+        <Select.IndicatorGroup
+          px="2"
+          minW="9"
+          justifyContent="center"
+          bg="transparent"
+        >
+          <Select.Indicator color={isDark ? "gray.300" : "gray.500"} />
         </Select.IndicatorGroup>
       </Select.Control>
       <Portal>
         <Select.Positioner>
-          <Select.Content bg={isDark ? "gray.800" : "white"} borderWidth="0">
+          <Select.Content
+            bg={isDark ? "gray.800" : "white"}
+            borderWidth="1px"
+            borderColor={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
+            boxShadow={isDark ? "0 12px 28px rgba(0,0,0,0.55)" : "0 12px 28px rgba(15,23,42,0.14)"}
+          >
             {collection.items.map((item) => (
-              <Select.Item key={item.value} item={item} color={isDark ? "gray.100" : "gray.900"}>
+              <Select.Item
+                key={item.value}
+                item={item}
+                color={isDark ? "gray.300" : "gray.800"}
+                _highlighted={{
+                  bg: isDark ? "whiteAlpha.200" : "blackAlpha.100",
+                  color: isDark ? "white" : "gray.900",
+                }}
+                _checked={{
+                  bg: isDark ? "blue.700" : "blue.100",
+                  color: isDark ? "white" : "blue.900",
+                }}
+              >
                 <Select.ItemText>{item.label}</Select.ItemText>
                 <Select.ItemIndicator />
               </Select.Item>

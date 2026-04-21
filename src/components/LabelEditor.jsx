@@ -8,8 +8,21 @@ import TipIconButton from "./TipIconButton";
 import CommandEditor from "./CommandEditor";
 import { EDITOR_FONT } from "../constants/editor";
 
-function EditorInput(props) {
-  return <Input size="sm" borderWidth="0" {...props} />;
+function EditorInput({ isDark, ...props }) {
+  return (
+    <Input
+      size="sm"
+      borderWidth="1px"
+      borderColor={isDark ? "whiteAlpha.200" : "blackAlpha.100"}
+      _hover={{ borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100" }}
+      cursor="text"
+      _focusVisible={{
+        boxShadow: "0 0 0 1px rgba(96,165,250,0.85)",
+        borderColor: isDark ? "whiteAlpha.200" : "blackAlpha.100",
+      }}
+      {...props}
+    />
+  );
 }
 
 function parseIndexId(id, prefix) {
@@ -90,6 +103,7 @@ const SortableLabel = memo(function SortableLabel({
 
         <Box flex="1" minW="0">
           <EditorInput
+            isDark={isDark}
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
@@ -328,7 +342,7 @@ const LabelEditor = memo(function LabelEditor({
   }, [jumpTo]);
 
   return (
-    <Flex direction="column" gap="1.5">
+    <Flex direction="column" gap="1.5" pr="2">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLabelDragEnd}>
         <SortableContext items={labelIds} strategy={verticalListSortingStrategy}>
           <Flex direction="column" gap="1.5">

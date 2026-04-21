@@ -149,14 +149,6 @@ function App() {
     }),
     [],
   );
-  const runButtonProps = useMemo(
-    () => ({
-      bg: isDark ? "blue.700" : "blue.500",
-      color: "white",
-      _hover: { bg: isDark ? "blue.600" : "blue.600" },
-    }),
-    [isDark],
-  );
   const subtleButtonProps = useMemo(
     () => ({
       bg: isDark ? "whiteAlpha.100" : "blackAlpha.100",
@@ -597,7 +589,7 @@ function App() {
               <TipIconButton
                 label="Run"
                 size="sm"
-                {...runButtonProps}
+                {...subtleButtonProps}
                 onClick={runPreview}
               >
                 <FiPlay />
