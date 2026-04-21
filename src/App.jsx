@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Flex, Grid, Portal, Tabs, Text, Textarea, Tooltip, useMediaQuery } from "@chakra-ui/react";
 import { FiColumns, FiCopy, FiCrosshair, FiEdit3, FiExternalLink, FiGrid, FiMonitor, FiPlay, FiShare2, FiSquare, FiX } from "react-icons/fi";
 import { astToScenes, parseScript, scenesToAst, serializeScript } from "./lib/script";
@@ -101,8 +101,11 @@ function App() {
   const [activeEditor, setActiveEditor] = useState("gui");
   const [activePanel, setActivePanel] = useState("editor");
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
+  const [guiScenes, setGuiScenes] = useState([]);
   const [ast, setAst] = useState([]);
   const [diagnostics, setDiagnostics] = useState([]);
+  const [isGuiDirty, setIsGuiDirty] = useState(false);
+  const [isTextDirty, setIsTextDirty] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [startLabel, setStartLabel] = useState("");
   const [aspect, setAspect] = useState("16:9");
@@ -112,38 +115,82 @@ function App() {
   const [runError, setRunError] = useState("");
   const [jumpToGuiTarget, setJumpToGuiTarget] = useState(null);
   const toastTimerRef = useRef(null);
+  const textParseTimerRef = useRef(null);
+  const storageTimerRef = useRef(null);
 
-  const iconButtonStyle = isDark
-    ? {
-        bg: "whiteAlpha.50",
-        color: "gray.100",
-        _hover: { bg: "whiteAlpha.200" },
-        _active: { bg: "whiteAlpha.250" },
-      }
-    : {
-        bg: "blackAlpha.50",
-        color: "gray.800",
-        _hover: { bg: "blackAlpha.100" },
-        _active: { bg: "blackAlpha.200" },
-      };
-  const iconTabTriggerProps = {
-    minW: "9",
-    h: "9",
-    px: "0",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    lineHeight: "1",
-    rounded: "md",
-    borderWidth: "0",
-  };
+  const iconButtonStyle = useMemo(
+    () =>
+      isDark
+        ? {
+            bg: "whiteAlpha.50",
+            color: "gray.100",
+            _hover: { bg: "whiteAlpha.200" },
+            _active: { bg: "whiteAlpha.250" },
+          }
+        : {
+            bg: "blackAlpha.50",
+            color: "gray.800",
+            _hover: { bg: "blackAlpha.100" },
+            _active: { bg: "blackAlpha.200" },
+          },
+    [isDark],
+  );
+  const iconTabTriggerProps = useMemo(
+    () => ({
+      minW: "9",
+      h: "9",
+      px: "0",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      lineHeight: "1",
+      rounded: "md",
+      borderWidth: "0",
+    }),
+    [],
+  );
 
-  const applyText = (nextText) => {
+  const applyText = useCallback((nextText) => {
     const parsed = parseScript(nextText);
+    const nextScenes = astToScenes(parsed.ast);
     setScriptText(nextText);
     setAst(parsed.ast);
+    setGuiScenes(nextScenes);
     setDiagnostics(parsed.diagnostics);
-  };
+    setIsGuiDirty(false);
+    setIsTextDirty(false);
+  }, []);
+
+  const buildAstFromScenes = useCallback((sourceScenes = guiScenes) => scenesToAst(sourceScenes), [guiScenes]);
+
+  const flushGuiToText = useCallback(
+    (sourceScenes = guiScenes) => {
+      const nextAst = scenesToAst(sourceScenes);
+      const nextText = serializeScript(nextAst);
+      setAst(nextAst);
+      setScriptText(nextText);
+      setIsGuiDirty(false);
+      return { nextAst, nextText };
+    },
+    [guiScenes],
+  );
+
+  const flushTextParse = useCallback(
+    (sourceText = scriptText) => {
+      if (textParseTimerRef.current) {
+        clearTimeout(textParseTimerRef.current);
+        textParseTimerRef.current = null;
+      }
+      const parsed = parseScript(sourceText);
+      const nextScenes = astToScenes(parsed.ast);
+      setAst(parsed.ast);
+      setGuiScenes(nextScenes);
+      setDiagnostics(parsed.diagnostics);
+      setIsTextDirty(false);
+      return parsed;
+    },
+    [scriptText],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -171,13 +218,65 @@ function App() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [applyText]);
 
   useEffect(() => {
-    if (ready) {
-      window.localStorage.setItem(STORAGE_KEY, scriptText);
+    if (activeEditor !== "text" || !isTextDirty) {
+      return undefined;
     }
-  }, [ready, scriptText]);
+    if (textParseTimerRef.current) {
+      clearTimeout(textParseTimerRef.current);
+    }
+    textParseTimerRef.current = setTimeout(() => {
+      const parsed = parseScript(scriptText);
+      const nextScenes = astToScenes(parsed.ast);
+      setAst(parsed.ast);
+      setGuiScenes(nextScenes);
+      setDiagnostics(parsed.diagnostics);
+      setIsTextDirty(false);
+      textParseTimerRef.current = null;
+    }, 140);
+    return () => {
+      if (textParseTimerRef.current) {
+        clearTimeout(textParseTimerRef.current);
+        textParseTimerRef.current = null;
+      }
+    };
+  }, [activeEditor, isTextDirty, scriptText]);
+
+  useEffect(() => {
+    if (!ready) {
+      return undefined;
+    }
+    if (isGuiDirty) {
+      return undefined;
+    }
+    if (storageTimerRef.current) {
+      clearTimeout(storageTimerRef.current);
+    }
+    storageTimerRef.current = setTimeout(() => {
+      window.localStorage.setItem(STORAGE_KEY, scriptText);
+      storageTimerRef.current = null;
+    }, 260);
+    return () => {
+      if (storageTimerRef.current) {
+        clearTimeout(storageTimerRef.current);
+        storageTimerRef.current = null;
+      }
+    };
+  }, [ready, scriptText, isGuiDirty]);
+
+  useEffect(() => {
+    if (!ready) {
+      return undefined;
+    }
+    const handleBeforeUnload = () => {
+      const textForStorage = isGuiDirty ? serializeScript(scenesToAst(guiScenes)) : scriptText;
+      window.localStorage.setItem(STORAGE_KEY, textForStorage);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [ready, isGuiDirty, scriptText, guiScenes]);
 
   useEffect(() => {
     document.documentElement.style.height = "100%";
@@ -194,42 +293,76 @@ function App() {
     }
   }, [isDark]);
 
-  const scenes = useMemo(() => astToScenes(ast), [ast]);
+  const scenes = useMemo(() => (activeEditor === "gui" ? guiScenes : []), [guiScenes, activeEditor]);
   const astIndexToGuiLocation = useMemo(() => buildAstIndexToGuiLocation(ast), [ast]);
-  const commandErrorMap = useMemo(() => buildCommandErrorMap(ast, diagnostics), [ast, diagnostics]);
+  const commandErrorMap = useMemo(
+    () => (activeEditor === "gui" && !isGuiDirty ? buildCommandErrorMap(ast, diagnostics) : {}),
+    [ast, diagnostics, activeEditor, isGuiDirty],
+  );
   const currentFrame = frames[frameIndex] || null;
   const labels = useMemo(() => {
     const set = new Set();
+    if (isGuiDirty) {
+      for (const scene of guiScenes) {
+        if (scene.label) {
+          set.add(scene.label);
+        }
+      }
+      return [...set];
+    }
     for (const command of ast) {
       if (command.type === "tag" && command.tag === "label" && command.attrs?.name) {
         set.add(command.attrs.name);
       }
     }
     return [...set];
-  }, [ast]);
+  }, [ast, guiScenes, isGuiDirty]);
   const characterNames = useMemo(() => {
     const set = new Set();
+    if (isGuiDirty) {
+      for (const scene of guiScenes) {
+        for (const command of scene.commands) {
+          if (command.type === "tag" && command.tag === "chara_new" && command.attrs?.name) {
+            set.add(command.attrs.name);
+          }
+        }
+      }
+      return [...set];
+    }
+    if (activeEditor !== "gui") {
+      return [];
+    }
     for (const command of ast) {
       if (command.type === "tag" && command.tag === "chara_new" && command.attrs?.name) {
         set.add(command.attrs.name);
       }
     }
     return [...set];
-  }, [ast]);
+  }, [ast, guiScenes, activeEditor, isGuiDirty]);
 
-  const updateByScenes = (nextScenes) => {
-    const nextAst = scenesToAst(nextScenes);
-    applyText(serializeScript(nextAst));
-  };
+  const updateByScenes = useCallback((nextScenes) => {
+    setGuiScenes(nextScenes);
+    setIsGuiDirty(true);
+    setDiagnostics([]);
+  }, []);
 
   const runPreview = () => {
-    if (diagnostics.length > 0) {
+    const parsed = isTextDirty ? flushTextParse(scriptText) : null;
+    let previewAst = isGuiDirty ? buildAstFromScenes(guiScenes) : parsed?.ast ?? ast;
+    let currentDiagnostics = parsed?.diagnostics ?? diagnostics;
+    if (isGuiDirty) {
+      const previewText = serializeScript(previewAst);
+      const parsedFromGui = parseScript(previewText);
+      previewAst = parsedFromGui.ast;
+      currentDiagnostics = parsedFromGui.diagnostics;
+    }
+    if (currentDiagnostics.length > 0) {
       setRunError("Fix parser errors.");
       return;
     }
     try {
       const result = runScenario({
-        ast,
+        ast: previewAst,
         startAt: { label: startLabel.trim() || undefined },
       });
       setFrames(result.frames);
@@ -250,7 +383,8 @@ function App() {
 
   const copyScript = async () => {
     try {
-      await navigator.clipboard.writeText(scriptText);
+      const text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      await navigator.clipboard.writeText(text);
       setStatusMessage("Copied");
     } catch {
       setStatusMessage("Copy failed");
@@ -259,7 +393,8 @@ function App() {
 
   const shareByUrl = async () => {
     try {
-      const encoded = await encodeScenario(scriptText);
+      const text = isGuiDirty ? flushGuiToText(guiScenes).nextText : scriptText;
+      const encoded = await encodeScenario(text);
       const url = new URL(window.location.href);
       url.searchParams.set("s", encoded);
       window.history.replaceState({}, "", url);
@@ -269,6 +404,27 @@ function App() {
       setStatusMessage("Share failed");
     }
   };
+
+  const handleEditorTabChange = useCallback(
+    (detail) => {
+      const nextEditor = detail.value;
+      if (nextEditor === "text" && isGuiDirty) {
+        flushGuiToText(guiScenes);
+      }
+      if (nextEditor === "gui" && isTextDirty) {
+        flushTextParse(scriptText);
+      }
+      setActiveEditor(nextEditor);
+    },
+    [guiScenes, isGuiDirty, isTextDirty, flushGuiToText, flushTextParse, scriptText],
+  );
+
+  const handleTextChange = useCallback((event) => {
+    const nextText = event.target.value;
+    setScriptText(nextText);
+    setIsGuiDirty(false);
+    setIsTextDirty(true);
+  }, []);
 
   const advanceFrame = () => {
     setFrameIndex((index) => Math.min(index + 1, Math.max(frames.length - 1, 0)));
@@ -287,7 +443,10 @@ function App() {
     if (astIndex == null) {
       return;
     }
-    const location = astIndexToGuiLocation.get(astIndex);
+    const indexMap = isGuiDirty
+      ? buildAstIndexToGuiLocation(buildAstFromScenes(guiScenes))
+      : astIndexToGuiLocation;
+    const location = indexMap.get(astIndex);
     if (!location) {
       return;
     }
@@ -482,7 +641,7 @@ function App() {
         >
           <Flex direction="column" h="100%" minH="0" overflow="hidden">
             <Flex mb="2" justify="space-between" align="center">
-              <Tabs.Root value={activeEditor} onValueChange={(detail) => setActiveEditor(detail.value)} variant="plain" size="sm">
+              <Tabs.Root value={activeEditor} onValueChange={handleEditorTabChange} variant="plain" size="sm">
                 <Tabs.List bg="transparent" p="0" gap="1" alignItems="center">
                   <Tooltip.Root openDelay={180} closeDelay={70} positioning={{ placement: "top" }}>
                     <Tooltip.Trigger asChild>
@@ -551,7 +710,7 @@ function App() {
                   resize="none"
                   overflow="auto"
                   value={scriptText}
-                  onChange={(event) => applyText(event.target.value)}
+                  onChange={handleTextChange}
                   bg={isDark ? "gray.800" : "white"}
                   color={isDark ? "gray.100" : "gray.900"}
                   _placeholder={{ color: isDark ? "gray.400" : "gray.500" }}

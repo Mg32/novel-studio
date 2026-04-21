@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Flex, Grid, Input, Menu, Portal, Text, Textarea } from "@chakra-ui/react";
 import {
   FiChevronRight,
@@ -26,40 +26,30 @@ function EditorInput(props) {
   return <Input size="sm" borderWidth="0" {...props} />;
 }
 
-function AutoResizeTextarea({ value, onChange, minH = 56, ...props }) {
-  const textareaRef = useRef(null);
-
-  useLayoutEffect(() => {
-    const element = textareaRef.current;
-    if (!element) {
-      return;
-    }
-    element.style.height = "auto";
-    element.style.height = `${Math.max(element.scrollHeight, minH)}px`;
-  }, [value, minH]);
+function AutoResizeTextarea({ value, onChange, minRows = 2, ...props }) {
+  const rows = useMemo(() => {
+    const text = value == null ? "" : String(value);
+    const lineCount = text.split("\n").length;
+    return Math.max(minRows, lineCount);
+  }, [value, minRows]);
 
   return (
     <Textarea
-      ref={textareaRef}
       size="sm"
       borderWidth="0"
       resize="none"
-      overflow="hidden"
-      minH={`${minH}px`}
+      overflow="auto"
+      rows={rows}
       value={value}
       onChange={onChange}
-      onInput={(event) => {
-        const element = event.currentTarget;
-        element.style.height = "auto";
-        element.style.height = `${Math.max(element.scrollHeight, minH)}px`;
-      }}
       {...props}
     />
   );
 }
 
-function ImagePreview({ src, alt, isDark, size = "68px" }) {
-  const [failed, setFailed] = useState(false);
+const ImagePreview = memo(function ImagePreview({ src, alt, isDark, size = "68px" }) {
+  const [failedSrc, setFailedSrc] = useState("");
+  const isFailed = Boolean(src) && failedSrc === src;
 
   return (
     <Box
@@ -74,12 +64,12 @@ function ImagePreview({ src, alt, isDark, size = "68px" }) {
       justifyContent="center"
       overflow="hidden"
     >
-      {src && !failed ? (
+      {src && !isFailed ? (
         <Box
           as="img"
           src={src}
           alt={alt}
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(src)}
           maxW="100%"
           maxH="100%"
           objectFit="contain"
@@ -91,7 +81,7 @@ function ImagePreview({ src, alt, isDark, size = "68px" }) {
       )}
     </Box>
   );
-}
+});
 
 function createCommandForType(nextValue) {
   if (nextValue === "speaker") {
@@ -151,7 +141,7 @@ function createTemplateOptions(baseOptions) {
 const bgTemplateOptions = createTemplateOptions(BG_TEMPLATE_OPTIONS);
 const charaTemplateOptions = createTemplateOptions(CHARA_TEMPLATE_OPTIONS);
 
-function CommandEditor({
+const CommandEditor = memo(function CommandEditor({
   command,
   onChange,
   onDelete,
@@ -165,15 +155,50 @@ function CommandEditor({
   const currentType =
     command.type === "text" ? "text" : command.type === "speaker" ? "speaker" : command.tag;
   const TypeIcon = commandTypeIconMap[currentType] ?? FiType;
+  const textCommitTimerRef = useRef(null);
+  const isTextEditingRef = useRef(false);
+  const latestCommandRef = useRef(command);
 
   const setAttr = (key, value) => {
     onChange({ ...command, attrs: { ...(command.attrs || {}), [key]: value } });
   };
-  const charaNameSelectOptions = [
-    { label: "name", value: "" },
-    ...characterNameOptions.map((name) => ({ label: name, value: name })),
-  ];
+  const charaNameSelectOptions = useMemo(
+    () => [{ label: "name", value: "" }, ...characterNameOptions.map((name) => ({ label: name, value: name }))],
+    [characterNameOptions],
+  );
   const currentCharaName = command.attrs?.name || "";
+  const guiText = toGuiTextValue(command.text || "");
+  const [textDraft, setTextDraft] = useState(guiText);
+
+  useEffect(() => {
+    latestCommandRef.current = command;
+  }, [command]);
+
+  useEffect(() => {
+    if (currentType !== "text") {
+      return;
+    }
+    if (!isTextEditingRef.current) {
+      setTextDraft(guiText);
+    }
+  }, [currentType, guiText]);
+
+  const commitText = useCallback(
+    (nextText) => {
+      onChange({ ...latestCommandRef.current, text: nextText });
+    },
+    [onChange],
+  );
+
+  useEffect(
+    () => () => {
+      if (textCommitTimerRef.current) {
+        clearTimeout(textCommitTimerRef.current);
+        textCommitTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   return (
     <Box p="0">
@@ -237,13 +262,34 @@ function CommandEditor({
 
         {command.type === "text" && (
           <AutoResizeTextarea
-            minH={56}
+            minRows={2}
             bg={isDark ? "gray.800" : "white"}
             color={isDark ? "gray.100" : "gray.900"}
             fontFamily={EDITOR_FONT}
-            value={toGuiTextValue(command.text || "")}
+            value={textDraft}
             placeholder="text"
-            onChange={(event) => onChange({ ...command, text: event.target.value })}
+            onFocus={() => {
+              isTextEditingRef.current = true;
+            }}
+            onBlur={() => {
+              isTextEditingRef.current = false;
+              if (textCommitTimerRef.current) {
+                clearTimeout(textCommitTimerRef.current);
+                textCommitTimerRef.current = null;
+              }
+              commitText(textDraft);
+            }}
+            onChange={(event) => {
+              const nextText = event.target.value;
+              setTextDraft(nextText);
+              if (textCommitTimerRef.current) {
+                clearTimeout(textCommitTimerRef.current);
+              }
+              textCommitTimerRef.current = setTimeout(() => {
+                commitText(nextText);
+                textCommitTimerRef.current = null;
+              }, 180);
+            }}
           />
         )}
 
@@ -272,7 +318,6 @@ function CommandEditor({
               />
             </Flex>
             <ImagePreview
-              key={command.attrs.storage || "bg-empty"}
               src={command.attrs.storage || ""}
               alt="background preview"
               isDark={isDark}
@@ -330,7 +375,6 @@ function CommandEditor({
               />
             </Flex>
             <ImagePreview
-              key={command.attrs.storage || "chara-empty"}
               src={command.attrs.storage || ""}
               alt="character preview"
               isDark={isDark}
@@ -361,6 +405,13 @@ function CommandEditor({
       </Box>
     </Box>
   );
-}
+},
+(prev, next) =>
+  prev.command === next.command &&
+  prev.errorMessage === next.errorMessage &&
+  prev.characterNameOptions === next.characterNameOptions &&
+  prev.isDark === next.isDark &&
+  prev.iconButtonStyle === next.iconButtonStyle,
+);
 
 export default CommandEditor;

@@ -1,12 +1,17 @@
+import { useMemo } from "react";
 import { Portal, Select, createListCollection } from "@chakra-ui/react";
 
 function AppSelect({ value, onChange, options, isDark, fontFamily, placeholder }) {
-  const collection = createListCollection({
-    items: options.map((option) => ({
-      label: option.label,
-      value: option.value,
-    })),
-  });
+  const collection = useMemo(
+    () =>
+      createListCollection({
+        items: options.map((option) => ({
+          label: option.label,
+          value: option.value,
+        })),
+      }),
+    [options],
+  );
 
   return (
     <Select.Root

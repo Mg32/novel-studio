@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Flex, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -10,10 +10,6 @@ import { EDITOR_FONT } from "../constants/editor";
 
 function EditorInput(props) {
   return <Input size="sm" borderWidth="0" {...props} />;
-}
-
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
 }
 
 function parseIndexId(id, prefix) {
@@ -28,7 +24,7 @@ function createInsertedTextCommand() {
   return { type: "text", text: "new text" };
 }
 
-function SortableLabel({
+const SortableLabel = memo(function SortableLabel({
   id,
   labelData,
   labelIndex,
@@ -156,9 +152,19 @@ function SortableLabel({
       ) : null}
     </Box>
   );
-}
+},
+(prev, next) =>
+  prev.id === next.id &&
+  prev.labelData === next.labelData &&
+  prev.labelIndex === next.labelIndex &&
+  prev.isOpen === next.isOpen &&
+  prev.isDark === next.isDark &&
+  prev.iconButtonStyle === next.iconButtonStyle &&
+  prev.commandErrors === next.commandErrors &&
+  prev.characterNameOptions === next.characterNameOptions,
+);
 
-function SortableCommand({
+const SortableCommand = memo(function SortableCommand({
   id,
   command,
   isDark,
@@ -197,7 +203,15 @@ function SortableCommand({
       />
     </Box>
   );
-}
+},
+(prev, next) =>
+  prev.id === next.id &&
+  prev.command === next.command &&
+  prev.errorMessage === next.errorMessage &&
+  prev.characterNameOptions === next.characterNameOptions &&
+  prev.isDark === next.isDark &&
+  prev.iconButtonStyle === next.iconButtonStyle,
+);
 
 function LabelEditor({
   scenes,
@@ -225,47 +239,65 @@ function LabelEditor({
     return base.includes(forced) ? base : [...base, forced];
   }, [openLabelIds, labelIds, jumpTo]);
 
-  const updateLabel = (labelIndex, updater) => {
-    const nextScenes = clone(scenes);
-    updater(nextScenes[labelIndex]);
-    onChange(nextScenes);
-  };
+  const updateLabel = useCallback(
+    (labelIndex, updater) => {
+      onChange(
+        scenes.map((scene, index) => {
+          if (index !== labelIndex) {
+            return scene;
+          }
+          return updater(scene);
+        }),
+      );
+    },
+    [scenes, onChange],
+  );
 
-  const deleteLabel = (labelIndex) => {
-    const nextScenes = clone(scenes);
-    nextScenes.splice(labelIndex, 1);
-    if (nextScenes.length === 0) {
-      nextScenes.push({ label: "start", commands: [] });
-    }
-    onChange(nextScenes);
-  };
+  const deleteLabel = useCallback(
+    (labelIndex) => {
+      const nextScenes = scenes.filter((_, index) => index !== labelIndex);
+      if (nextScenes.length === 0) {
+        onChange([{ label: "start", commands: [] }]);
+        return;
+      }
+      onChange(nextScenes);
+    },
+    [scenes, onChange],
+  );
 
-  const handleLabelDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) {
-      return;
-    }
-    const activeIndex = parseIndexId(active.id, "label-");
-    const overIndex = parseIndexId(over.id, "label-");
-    if (activeIndex < 0 || overIndex < 0) {
-      return;
-    }
-    onChange(arrayMove(scenes, activeIndex, overIndex));
-  };
+  const handleLabelDragEnd = useCallback(
+    ({ active, over }) => {
+      if (!over || active.id === over.id) {
+        return;
+      }
+      const activeIndex = parseIndexId(active.id, "label-");
+      const overIndex = parseIndexId(over.id, "label-");
+      if (activeIndex < 0 || overIndex < 0) {
+        return;
+      }
+      onChange(arrayMove(scenes, activeIndex, overIndex));
+    },
+    [scenes, onChange],
+  );
 
-  const handleCommandDragEnd = (labelIndex) => ({ active, over }) => {
-    if (!over || active.id === over.id) {
-      return;
-    }
-    const commandPrefix = `command-${labelIndex}-`;
-    const activeIndex = parseIndexId(active.id, commandPrefix);
-    const overIndex = parseIndexId(over.id, commandPrefix);
-    if (activeIndex < 0 || overIndex < 0) {
-      return;
-    }
-    updateLabel(labelIndex, (draft) => {
-      draft.commands = arrayMove(draft.commands, activeIndex, overIndex);
-    });
-  };
+  const handleCommandDragEnd = useCallback(
+    (labelIndex) => ({ active, over }) => {
+      if (!over || active.id === over.id) {
+        return;
+      }
+      const commandPrefix = `command-${labelIndex}-`;
+      const activeIndex = parseIndexId(active.id, commandPrefix);
+      const overIndex = parseIndexId(over.id, commandPrefix);
+      if (activeIndex < 0 || overIndex < 0) {
+        return;
+      }
+      updateLabel(labelIndex, (scene) => ({
+        ...scene,
+        commands: arrayMove(scene.commands, activeIndex, overIndex),
+      }));
+    },
+    [updateLabel],
+  );
 
   useEffect(() => {
     if (!jumpTo || jumpTo.labelIndex == null) {
@@ -317,31 +349,39 @@ function LabelEditor({
                   )
                 }
                 onChangeLabelName={(label) =>
-                  updateLabel(labelIndex, (draft) => {
-                    draft.label = label;
-                  })
+                  updateLabel(labelIndex, (sceneData) => ({ ...sceneData, label }))
                 }
                 onDeleteLabel={() => deleteLabel(labelIndex)}
                 onAddCommand={() =>
-                  updateLabel(labelIndex, (draft) => {
-                    draft.commands.push(createInsertedTextCommand());
-                  })
+                  updateLabel(labelIndex, (sceneData) => ({
+                    ...sceneData,
+                    commands: [...sceneData.commands, createInsertedTextCommand()],
+                  }))
                 }
                 onCommandDragEnd={handleCommandDragEnd(labelIndex)}
                 onCommandChange={(commandIndex, nextCommand) =>
-                  updateLabel(labelIndex, (draft) => {
-                    draft.commands[commandIndex] = nextCommand;
-                  })
+                  updateLabel(labelIndex, (sceneData) => ({
+                    ...sceneData,
+                    commands: sceneData.commands.map((command, index) =>
+                      index === commandIndex ? nextCommand : command,
+                    ),
+                  }))
                 }
                 onCommandDelete={(commandIndex) =>
-                  updateLabel(labelIndex, (draft) => {
-                    draft.commands.splice(commandIndex, 1);
-                  })
+                  updateLabel(labelIndex, (sceneData) => ({
+                    ...sceneData,
+                    commands: sceneData.commands.filter((_, index) => index !== commandIndex),
+                  }))
                 }
                 onCommandAddAfter={(commandIndex) =>
-                  updateLabel(labelIndex, (draft) => {
-                    draft.commands.splice(commandIndex + 1, 0, createInsertedTextCommand());
-                  })
+                  updateLabel(labelIndex, (sceneData) => ({
+                    ...sceneData,
+                    commands: [
+                      ...sceneData.commands.slice(0, commandIndex + 1),
+                      createInsertedTextCommand(),
+                      ...sceneData.commands.slice(commandIndex + 1),
+                    ],
+                  }))
                 }
                 commandErrors={commandErrorMap?.[labelIndex] || {}}
                 characterNameOptions={characterNameOptions}
