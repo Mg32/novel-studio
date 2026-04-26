@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Flex, Grid, Portal, Tabs, Text, Tooltip, useMediaQuery } from "@chakra-ui/react";
 import { FiColumns, FiCopy, FiCrosshair, FiEdit3, FiExternalLink, FiGrid, FiMonitor, FiPlay, FiShare2, FiSquare, FiX } from "react-icons/fi";
 import { astToScenes, parseScript, scenesToAst, serializeScript } from "./lib/script";
@@ -7,9 +7,10 @@ import { decodeScenario, encodeScenario } from "./lib/share";
 import { DEFAULT_SCRIPT, EDITOR_FONT, STORAGE_KEY } from "./constants/editor";
 import AppSelect from "./components/AppSelect";
 import TipIconButton from "./components/TipIconButton";
-import LabelEditor from "./components/LabelEditor";
 import StageView from "./components/StageView";
-import TextScriptEditor from "./components/TextScriptEditor";
+
+const LabelEditor = lazy(() => import("./components/LabelEditor"));
+const TextScriptEditor = lazy(() => import("./components/TextScriptEditor"));
 
 function buildAstIndexToGuiLocation(ast) {
   const map = new Map();
@@ -736,24 +737,28 @@ function App() {
 
             <Box flex="1" minH="0" overflow={activeEditor === "gui" ? "auto" : "hidden"}>
               {activeEditor === "gui" ? (
-                <LabelEditor
-                  scenes={scenes}
-                  labelOptions={labels}
-                  onChange={updateByScenes}
-                  isDark={isDark}
-                  iconButtonStyle={iconButtonStyle}
-                  jumpTo={jumpToGuiTarget}
-                  commandErrorMap={commandErrorMap}
-                  characterNameOptions={characterNames}
-                />
+                <Suspense fallback={<Box p="2"><Text fontSize="xs">Loading GUI editor...</Text></Box>}>
+                  <LabelEditor
+                    scenes={scenes}
+                    labelOptions={labels}
+                    onChange={updateByScenes}
+                    isDark={isDark}
+                    iconButtonStyle={iconButtonStyle}
+                    jumpTo={jumpToGuiTarget}
+                    commandErrorMap={commandErrorMap}
+                    characterNameOptions={characterNames}
+                  />
+                </Suspense>
               ) : (
-                <TextScriptEditor
-                  ref={textEditorRef}
-                  value={scriptText}
-                  onCommit={applyText}
-                  isDark={isDark}
-                  fontFamily={EDITOR_FONT}
-                />
+                <Suspense fallback={<Box p="2"><Text fontSize="xs">Loading text editor...</Text></Box>}>
+                  <TextScriptEditor
+                    ref={textEditorRef}
+                    value={scriptText}
+                    onCommit={applyText}
+                    isDark={isDark}
+                    fontFamily={EDITOR_FONT}
+                  />
+                </Suspense>
               )}
 
               {activeEditor === "text" && diagnostics.length > 0 && (
